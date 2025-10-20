@@ -15,7 +15,7 @@
     /********** CONFIG - REPLACE THESE VALUES **********/
     const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA'; 
-    const IG_USERNAME = 'mahdihasan1_'; 
+    const ORDER_EMAIL = 'mahdihasan3620tics@gmail.com'; // <-- replace with your email
     /***************************************************/
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -44,7 +44,7 @@
         // product link
         const productLink = `${window.location.origin}${window.location.pathname}?product=${p.id}`;
 
-        // message to copy
+        // message to copy / prefill email body
         const message = `I want to buy this: ${p.name} — QAR ${p.price} — Product link: ${productLink}`;
 
         card.innerHTML = `
@@ -52,7 +52,7 @@
           <div>Price: QAR ${p.price || 0} — Stock: ${p.stock || 0}</div>
           <div style="margin-top:6px">${imgsHtml}</div>
           <div style="margin-top:8px">
-            <button class="insta-btn" data-msg="${escapeAttr(message)}">Liked it? Order now via Insta</button>
+            <button class="email-btn" data-msg="${escapeAttr(message)}">Liked it? Order now via Email</button>
           </div>
           <div style="font-size:12px;color:#666;margin-top:6px">Description: ${escapeHtml(p.description || '')}</div>
         `;
@@ -60,7 +60,7 @@
       });
 
       // attach click listeners
-      document.querySelectorAll('.insta-btn').forEach(btn => {
+      document.querySelectorAll('.email-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const msg = btn.dataset.msg;
 
@@ -76,12 +76,15 @@
             ta.remove();
           }
 
-          // Open Instagram web DM inbox (reliable across all browsers)
-          window.open('https://www.instagram.com/direct/t/17845474686091989/');
+          // Open Gmail compose with prefilled email
+          const subject = encodeURIComponent("Order Inquiry");
+          const body = encodeURIComponent(msg);
+          const mailtoLink = `https://mail.google.com/mail/?view=cm&to=${ORDER_EMAIL}&su=${subject}&body=${body}`;
+          window.open(mailtoLink, '_blank');
 
           // Toast notification
           const t = document.createElement('div');
-          t.textContent = 'Message copied! Open Instagram DM and paste it to order.';
+          t.textContent = 'Message copied! Gmail compose opened. Press send to order.';
           Object.assign(t.style, {
             position:'fixed',
             bottom:'20px',
@@ -116,4 +119,3 @@
   </script>
 </body>
 </html>
-
