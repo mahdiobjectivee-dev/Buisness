@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Shop — Public</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body>
+  <h2>Shop — Products</h2>
+  <div id="product-list">Loading products...</div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    /********** CONFIG - REPLACE THESE VALUES **********/
+    const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co'; 
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA'; 
+    const IG_USERNAME = 'mahdihasan1_'; 
+    /***************************************************/
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const productList = document.getElementById('product-list');
+
+    // Load products
+    async function loadPublicProducts(){
+      productList.textContent = 'Loading products...';
+      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      if (error) { productList.textContent = 'Error loading products: ' + error.message; return; }
+      if (!data || data.length === 0) { productList.textContent = 'No products yet.'; return; }
+
+      productList.innerHTML = '';
+      data.forEach(p => {
+        const card = document.createElement('div');
+        card.style.border = '1px solid #ccc';
+        card.style.padding = '8px';
+        card.style.marginBottom = '10px';
+
+        // images
+        let imgsHtml = '';
+        (p.image_urls || []).forEach(u => {
+          if (u) imgsHtml += `<img src="${u}" style="max-height:100px; margin-right:6px; display:inline-block;" />`;
+        });
+
+        // product link
+        const productLink = `${window.location.origin}${window.location.pathname}?product=${p.id}`;
+
+        // message to copy
+        const message = `I want to buy this: ${p.name} — QAR ${p.price} — Product link: ${productLink}`;
+
+        card.innerHTML = `
+          <div><strong>${escapeHtml(p.name)}</strong></div>
+          <div>Price: QAR ${p.price || 0} — Stock: ${p.stock || 0}</div>
+          <div style="margin-top:6px">${imgsHtml}</div>
+          <div style="margin-top:8px">
+            <button class="insta-btn" data-msg="${escapeAttr(message)}">Liked it? Order now via Insta</button>
+          </div>
+          <div style="font-size:12px;color:#666;margin-top:6px">Description: ${escapeHtml(p.description || '')}</div>
+        `;
+        productList.appendChild(card);
+      });
+
+      // attach click listeners
+      document.querySelectorAll('.insta-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const msg = btn.dataset.msg;
+
+          // Copy to clipboard
+          try { 
+            await navigator.clipboard.writeText(msg); 
+          } catch (e) {
+            const ta = document.createElement('textarea'); 
+            ta.value = msg; 
+            document.body.appendChild(ta); 
+            ta.select(); 
+            document.execCommand('copy'); 
+            ta.remove();
+          }
+
+          // Open Instagram web DM inbox (reliable across all browsers)
+          window.open('https://www.instagram.com/direct/inbox/', '_blank');
+
+          // Toast notification
+          const t = document.createElement('div');
+          t.textContent = 'Message copied! Open Instagram DM and paste it to order.';
+          Object.assign(t.style, {
+            position:'fixed',
+            bottom:'20px',
+            left:'50%',
+            transform:'translateX(-50%)',
+            padding:'10px 14px',
+            background:'#222',
+            color:'#fff',
+            borderRadius:'6px',
+            zIndex:9999
+          });
+          document.body.appendChild(t);
+          setTimeout(() => t.remove(), 3500);
+        });
+      });
+    }
+
+    // helpers
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"'`=\/]/g, function(s) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','=':'&#x3D;','/':'&#x2F;'})[s];
+      });
+    }
+    function escapeAttr(str) {
+      if (!str) return '';
+      return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // init
+    loadPublicProducts();
+  </script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Admin — Product Manager (no CSS)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body>
+  <h2>Admin — Product Manager (no CSS)</h2>
+
+  <!-- AUTH -->
+  <div id="auth-section">
+    <h3>Sign in / Sign up (admin)</h3>
+    <div id="auth-forms">
+      <input id="email" placeholder="admin email" />
+      <input id="password" placeholder="password" type="password" />
+      <button id="btn-signup">Sign up (create admin)</button>
+      <button id="btn-signin">Sign in</button>
+    </div>
+    <div id="auth-msg" style="color: red; margin-top: 8px"></div>
+  </div>
+
+  <!-- ADMIN PANEL (hidden until login) -->
+  <div id="admin-panel" style="display:none; margin-top:20px;">
+    <button id="btn-logout">Logout</button>
+
+    <h3>Create Product</h3>
+    <div id="create-area">
+      <input id="p-name" placeholder="Product name" /><br/>
+      <input id="p-sku" placeholder="SKU (optional)" /><br/>
+      <textarea id="p-desc" placeholder="Description"></textarea><br/>
+      <input id="p-price" placeholder="Price (e.g., 45.00)" /><br/>
+      <input id="p-stock" placeholder="Stock (integer)" /><br/>
+      <div>
+        Image 1: <input type="file" id="img1" accept="image/*" /><br/>
+        Image 2: <input type="file" id="img2" accept="image/*" /><br/>
+        Image 3: <input type="file" id="img3" accept="image/*" /><br/>
+      </div>
+      <button id="btn-create-product">Create Product</button>
+      <div id="create-msg" style="margin-top:8px;color:green"></div>
+    </div>
+
+    <h3>Products (edit/delete)</h3>
+    <div id="products-list">Loading...</div>
+  </div>
+
+  <!-- Use ESM import of Supabase client -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    /********** CONFIG - REPLACE THESE VALUES **********/
+  const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co'; // <-- replace
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA'; // <-- replace
+  const BUCKET_NAME = 'product-images'; // <-- replace with your bucket name
+  /***************************************************/
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // DOM elements
+    const authSection = document.getElementById('auth-section');
+    const adminPanel = document.getElementById('admin-panel');
+    const authMsg = document.getElementById('auth-msg');
+    const createMsg = document.getElementById('create-msg');
+    const productsList = document.getElementById('products-list');
+
+    // Helper: show admin UI if session exists
+    async function checkSessionAndShow() {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        authSection.style.display = 'none';
+        adminPanel.style.display = 'block';
+        loadProducts();
+      } else {
+        authSection.style.display = 'block';
+        adminPanel.style.display = 'none';
+      }
+    }
+
+    // On load
+    (async function init(){ await checkSessionAndShow(); })();
+
+    // Sign up
+    document.getElementById('btn-signup').addEventListener('click', async () => {
+      authMsg.textContent = '';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) { authMsg.textContent = 'Enter email & password'; return; }
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) authMsg.textContent = 'Signup error: ' + error.message;
+      else {
+        authMsg.style.color = 'green';
+        authMsg.textContent = 'Signup success. Check email if confirmation is required. Then sign in.';
+      }
+    });
+
+    // Sign in
+    document.getElementById('btn-signin').addEventListener('click', async () => {
+      authMsg.textContent = '';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) { authMsg.textContent = 'Enter email & password'; return; }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        authMsg.textContent = 'Sign in error: ' + error.message;
+        return;
+      }
+      // Show admin
+      await checkSessionAndShow();
+    });
+
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      authSection.style.display = 'block';
+      adminPanel.style.display = 'none';
+    });
+
+    // Create product handler
+    document.getElementById('btn-create-product').addEventListener('click', async () => {
+      createMsg.textContent = '';
+      const name = document.getElementById('p-name').value.trim();
+      const sku = document.getElementById('p-sku').value.trim();
+      const desc = document.getElementById('p-desc').value.trim();
+      const price = parseFloat(document.getElementById('p-price').value) || 0;
+      const stock = parseInt(document.getElementById('p-stock').value) || 0;
+      if (!name) { createMsg.style.color='red'; createMsg.textContent = 'Product name is required'; return; }
+
+      // Collect files
+      const files = [
+        document.getElementById('img1').files[0],
+        document.getElementById('img2').files[0],
+        document.getElementById('img3').files[0]
+      ].filter(Boolean);
+
+      // Upload files to storage
+      const publicUrls = [];
+      for (const file of files) {
+        try {
+          const filename = `${Date.now()}_${file.name.replace(/\s+/g,'_')}`;
+          const path = filename;
+          const { data: uploadData, error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(path, file, { cacheControl: '3600', upsert: false });
+          if (uploadError) { createMsg.style.color='red'; createMsg.textContent = 'Upload error: ' + uploadError.message; return; }
+          const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(path);
+          const publicUrl = urlData?.publicUrl || urlData?.publicURL || '';
+          publicUrls.push(publicUrl);
+        } catch (err) {
+          createMsg.style.color='red';
+          createMsg.textContent = 'Upload exception: ' + err.message;
+          return;
+        }
+      }
+
+      // Insert into DB
+      const { data: insertData, error: insertError } = await supabase.from('products').insert([{
+        sku, name, description: desc, price, stock, image_urls: publicUrls
+      }]);
+      if (insertError) {
+        createMsg.style.color='red';
+        createMsg.textContent = 'DB insert error: ' + insertError.message;
+        return;
+      }
+
+      createMsg.style.color='green';
+      createMsg.textContent = 'Product created successfully';
+      // Reset inputs
+      document.getElementById('p-name').value = '';
+      document.getElementById('p-sku').value = '';
+      document.getElementById('p-desc').value = '';
+      document.getElementById('p-price').value = '';
+      document.getElementById('p-stock').value = '';
+      document.getElementById('img1').value = '';
+      document.getElementById('img2').value = '';
+      document.getElementById('img3').value = '';
+      // Refresh list
+      await loadProducts();
+    });
+
+    // Load products
+    async function loadProducts() {
+      productsList.textContent = 'Loading...';
+      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      if (error) { productsList.textContent = 'Error loading: ' + error.message; return; }
+      if (!data || data.length === 0) { productsList.textContent = 'No products yet.'; return; }
+
+      productsList.innerHTML = ''; // clear
+      data.forEach(p => {
+        const container = document.createElement('div');
+        container.style.border = '1px solid #ddd';
+        container.style.padding = '8px';
+        container.style.marginBottom = '8px';
+
+        // show images (if any)
+        let imgsHtml = '';
+        (p.image_urls || []).forEach(u => {
+          if (u) imgsHtml += `<img src="${u}" style="max-height:60px; margin-right:6px;" />`;
+        });
+
+        container.innerHTML = `
+          <div><strong>${escapeHtml(p.name)}</strong> (ID: ${p.id})</div>
+          <div>SKU: ${escapeHtml(p.sku || '')} — Price: ${p.price || 0} — Stock: <input data-id="${p.id}" class="stock-input" value="${p.stock || 0}" style="width:80px" /></div>
+          <div style="margin-top:6px">${imgsHtml}</div>
+          <div style="margin-top:6px">
+            <button data-id="${p.id}" class="save-stock">Save</button>
+            <button data-id="${p.id}" class="edit-prod">Edit</button>
+            <button data-id="${p.id}" class="delete-prod">Delete</button>
+          </div>
+          <div style="font-size:12px;color:#666;margin-top:6px">Created: ${p.created_at}</div>
+        `;
+
+        productsList.appendChild(container);
+      });
+
+      // attach handlers
+      document.querySelectorAll('.save-stock').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = parseInt(btn.dataset.id);
+          const input = document.querySelector('.stock-input[data-id="'+id+'"]');
+          const newStock = parseInt(input.value) || 0;
+          const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', id);
+          if (error) alert('Update error: ' + error.message);
+          else { alert('Stock updated'); await loadProducts(); }
+        });
+      });
+
+      document.querySelectorAll('.delete-prod').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this product?')) return;
+          const id = parseInt(btn.dataset.id);
+          const { error } = await supabase.from('products').delete().eq('id', id);
+          if (error) alert('Delete error: ' + error.message);
+          else { alert('Deleted'); await loadProducts(); }
+        });
+      });
+
+      document.querySelectorAll('.edit-prod').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = parseInt(btn.dataset.id);
+          const row = (await supabase.from('products').select('*').eq('id', id).single()).data;
+          if (!row) { alert('Product not found'); return; }
+          const newName = prompt('Product name:', row.name) || row.name;
+          const newPrice = parseFloat(prompt('Price:', row.price) || row.price) || 0;
+          const newDesc = prompt('Description:', row.description || '') || '';
+          const { error } = await supabase.from('products').update({ name: newName, price: newPrice, description: newDesc }).eq('id', id);
+          if (error) alert('Update error: ' + error.message);
+          else { alert('Updated'); await loadProducts(); }
+        });
+      });
+
+    } // end loadProducts
+
+    // small html-escape helper
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"'`=\/]/g, function(s) {
+        return ({
+          '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','=':'&#x3D;','/':'&#x2F;'
+        })[s];
+      });
+    }
+
+  </script>
+</body>
+</html>
