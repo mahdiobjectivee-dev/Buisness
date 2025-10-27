@@ -561,6 +561,22 @@
 .more-empty { padding:12px; color:var(--muted); background:#fff; border-radius:10px; box-shadow:var(--soft-shadow); }
 
 
+/* --- Always center main product image --- */
+.gallery {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column; /* keeps thumbs below main image */
+  text-align: center;
+}
+
+.gallery .main-img {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
 
 /* --- Responsive Fix: make "More products" 2 per row on mobile --- */
 @media (max-width: 600px) {
