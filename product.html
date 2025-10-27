@@ -560,11 +560,105 @@
 
 .more-empty { padding:12px; color:var(--muted); background:#fff; border-radius:10px; box-shadow:var(--soft-shadow); }
 
-/* reduce motion */
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
-  .thumbs img, .info, .gallery .main-img, .ai-promo, .more-card { opacity: 1 !important; transform: none !important; }
+
+
+/* --- Responsive Fix: make "More products" 2 per row on mobile --- */
+@media (max-width: 600px) {
+  .more-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    justify-items: center;
+    padding: 0 6px;
+  }
+
+  .more-card {
+    width: 100% !important;
+    max-width: 180px !important; /* perfect size for 2-per-row look */
+  }
+
+  .more-card .thumb {
+    height: 100px !important;
+  }
 }
+
+/* ---------- Fixed product detail image sizes (paste at END of <style>) ---------- */
+/* Change these values to choose sizes */
+:root {
+  --main-img-size: 320px;   /* main gallery image box (square) */
+  --thumb-size: 70px;       /* thumbnail size */
+  --main-img-radius: 10px;  /* corner radius for main image */
+}
+
+/* predictable sizing */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+/* Force the gallery's main image container to a fixed square.
+   This overrides the inline style height you currently have. */
+.gallery > div:first-child {
+  width: var(--main-img-size) !important;
+  height: var(--main-img-size) !important;
+  min-width: 0;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--main-img-radius) !important;
+  overflow: hidden;
+  margin: 0 auto; /* center on small screens when container becomes block */
+  background: #f8fbff;
+}
+
+/* Main image fills the box; use cover so image area is always same size.
+   If you prefer to always show whole image (no crop), change 'cover' -> 'contain'. */
+.gallery .main-img,
+.gallery .main-img img,
+.gallery .main-img.product-image,
+#main-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important; /* use 'contain' if you prefer no cropping */
+  display: block !important;
+  border-radius: inherit !important;
+}
+
+/* Thumbnails fixed size */
+.thumbs img {
+  width: var(--thumb-size) !important;
+  height: var(--thumb-size) !important;
+  min-width: var(--thumb-size) !important;
+  min-height: var(--thumb-size) !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
+}
+
+/* Overlay fixed to same thumb size */
+.thumb-overlay {
+  width: var(--thumb-size) !important;
+  height: var(--thumb-size) !important;
+  border-radius: 8px !important;
+  line-height: 1;
+}
+
+/* Ensure the gallery + info stack nicely on narrow screens while still keeping fixed sizes */
+@media (max-width: 900px) {
+  .top { flex-direction: column; align-items: center; gap: 14px; }
+  .gallery, .info { width: 100%; box-sizing: border-box; }
+  /* center the fixed main image */
+  .gallery > div:first-child { margin: 0; }
+}
+
+/* Optional: slightly reduce fixed sizes on very small phones to avoid overflow */
+@media (max-width: 360px) {
+  :root { --main-img-size: 240px; --thumb-size: 52px; }
+}
+
+/* Defensive: prevent horizontal scroll if anything slips out */
+html, body { overflow-x: hidden; }
+
+
+
+
 </style>
 
 </head>
@@ -630,7 +724,6 @@
   <!-- AI search promo: "Can't find what you want?" -->
 <div class="ai-promo" id="aiPromo">
   <div class="left">
-    <div class="icon">AI</div>
     <div>
       <h3>Can't find what you want?</h3>
       <p>Try our smart AI search — describe what you need in plain words and we’ll suggest products.</p>
