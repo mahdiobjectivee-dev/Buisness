@@ -123,6 +123,12 @@
     --shadow:0 8px 26px rgba(16,24,40,0.06);
     --soft-shadow:0 6px 18px rgba(15,30,40,0.06);
     --cart-width:340px;
+
+    /* SLOWED animation tuning */
+    --anim-fast: 420ms;
+    --anim-medium: 900ms;
+    --anim-slow: 2000ms;
+    --easing: cubic-bezier(.2,.9,.2,1);
   }
 
   #catalog {
@@ -196,9 +202,19 @@
     cursor: pointer;
     flex: 0 0 220px;
     min-width: 220px;
+
+    /* start hidden for entrance animation */
+    opacity: 0;
+    transform: translateY(14px) scale(.995);
   }
+  .product-card.in {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: transform var(--anim-medium) var(--easing), opacity var(--anim-medium) var(--easing);
+  }
+
   .product-card:hover {
-    transform: translateY(-6px);
+    transform: translateY(-6px) scale(1.01);
     box-shadow: 0 18px 40px rgba(16,24,40,0.12);
   }
 
@@ -207,6 +223,8 @@
     height: 140px;
     object-fit: cover;
     border-radius: 10px;
+    transition: transform .45s var(--easing), filter .25s linear;
+    will-change: transform;
   }
   .product-card:hover .product-image { transform: scale(1.03); }
 
@@ -232,7 +250,7 @@
     font-weight: 800;
     width: 100%;
     box-shadow: 0 8px 18px rgba(106,168,214,0.16);
-    transition: transform .12s ease;
+    transition: transform .12s ease, box-shadow .12s ease;
   }
   .add-btn:active { transform: translateY(1px); }
 
@@ -284,6 +302,25 @@
     border-radius: 999px;
     font-weight: 700;
     font-size: 12px;
+  }
+
+  /* cart pulse animation */
+  #cart-toggle.pulse {
+    animation: cartPulse var(--anim-slow) cubic-bezier(.2,.9,.2,1);
+  }
+  @keyframes cartPulse {
+    0% { transform: translateY(0) scale(1); box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+    40% { transform: translateY(-6px) scale(1.03); box-shadow: 0 16px 36px rgba(16,24,40,0.16); }
+    100% { transform: translateY(0) scale(1); box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+  }
+  #cart-toggle .count.bump {
+    animation: bump .78s cubic-bezier(.2,.9,.2,1);
+  }
+  @keyframes bump {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.35); }
+    60% { transform: scale(.95); }
+    100% { transform: scale(1); }
   }
 
   /* Cart panel */
@@ -571,7 +608,95 @@
 
 footer{max-width:1000px;margin:28px auto;text-align:center;color:var(--muted)}
 
-</style>
+/* -------------------
+   ADDED ANIMATIONS (SLOWED)
+   ------------------- */
+
+/* subtle moving overlay to make background feel alive */
+body::before{
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00) 30%, rgba(0,0,0,0.01));
+  mix-blend-mode: overlay;
+  opacity: 0.9;
+  animation: bgShift 28s linear infinite;
+  z-index: 0;
+}
+@keyframes bgShift{
+  0% { transform: translateX(-6%); }
+  50% { transform: translateX(6%); }
+  100% { transform: translateX(-6%); }
+}
+
+/* floating hero logo (slower) */
+.logo {
+  transform-origin: center;
+  will-change: transform;
+  animation: logoFloat 12s ease-in-out infinite, logoEntrance 1100ms cubic-bezier(.2,.9,.2,1);
+}
+@keyframes logoFloat {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-0.2deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes logoEntrance {
+  from { opacity: 0; transform: translateY(-8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* navbar links animate in with a small stagger */
+.navbar a { opacity: 0; transform: translateY(8px); }
+.navbar.ready a { animation: navIn var(--anim-medium) var(--easing) forwards; }
+@keyframes navIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* cards and hero image micro-interactions */
+.card { will-change: transform, opacity; opacity: 0; transform: translateY(8px) scale(.998); }
+.card.in { opacity: 1; transform: translateY(0) scale(1); transition: transform var(--anim-slow) var(--easing), opacity var(--anim-slow) var(--easing); }
+.card img { transition: transform .9s var(--easing), filter .3s ease; will-change: transform; }
+.card:hover img { transform: scale(1.02) rotate(-0.2deg); filter: brightness(55%); }
+
+/* subtle shimmer on images while loading - using pseudo-element on product-image */
+.product-image[data-loading="true"] {
+  position: relative;
+  overflow: hidden;
+}
+.product-image[data-loading="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 100%);
+  transform: translateX(-110%);
+  animation: shimmer 2400ms linear infinite;
+}
+@keyframes shimmer { to { transform: translateX(110%); } }
+
+/* ai icon subtle pulse (slower) */
+.ai-promo .icon { animation: aiPulse 4800ms ease-in-out infinite; }
+@keyframes aiPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.92; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* product name small slide on hover */
+.product-card .product-name { transition: transform var(--anim-fast) var(--easing); }
+.product-card:hover .product-name { transform: translateY(-3px); }
+
+/* see-all card small glow */
+.product-card.see-all { transition: box-shadow .18s ease, transform .18s ease; }
+.product-card.see-all:hover { box-shadow: 0 20px 48px rgba(16,24,40,0.10); transform: translateY(-8px); }
+
+/* respect user's reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .product-card, .card { opacity: 1; transform: none; }
+  body::before { display: none; }
+}
+  </style>
 
 
 </head>
@@ -740,6 +865,9 @@ document.getElementById('openAISearch').addEventListener('click', function () {
           image.className = 'product-image';
           image.src = imgSrc || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240"><rect width="100%" height="100%" fill="%23eee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23888" font-size="20">No Image</text></svg>';
           image.alt = p.name || 'product';
+          // show shimmer until image loads (only visual)
+          image.setAttribute('data-loading','true');
+          image.addEventListener('load', ()=> image.removeAttribute('data-loading'));
 
           const name = document.createElement('div');
           name.className = 'product-name';
@@ -828,6 +956,8 @@ document.getElementById('openAISearch').addEventListener('click', function () {
           image.className = 'product-image';
           image.src = imgSrc || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240"><rect width="100%" height="100%" fill="%23eee"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23888" font-size="20">No Image</text></svg>';
           image.alt = p.name || 'product';
+          image.setAttribute('data-loading','true');
+          image.addEventListener('load', ()=> image.removeAttribute('data-loading'));
 
           const name = document.createElement('div');
           name.className = 'product-name';
@@ -990,7 +1120,7 @@ function renderCart() {
     }
 
     function openCart() { cartEl.classList.remove('hidden'); cartEl.style.display='block'; cartEl.setAttribute('aria-hidden','false'); cartToggle.setAttribute('aria-expanded','true'); }
-    function closeCart() { cartEl.classList.add('hidden'); cartEl.setAttribute('aria-hidden','true'); cartToggle.setAttribute('aria-expanded','false'); setTimeout(()=>{ if(cartEl.classList.contains('hidden')) cartEl.style.display='none'; },220);}
+    function closeCart() { cartEl.classList.add('hidden'); cartEl.setAttribute('aria-hidden','true'); cartToggle.setAttribute('aria-expanded','false'); setTimeout(()=>{ if(cartEl.classList.contains('hidden')) cartEl.style.display='none'; },600);}
     function toggleCart() { if(cartEl.classList.contains('hidden')) openCart(); else closeCart(); }
 
     document.getElementById('checkout-btn').addEventListener('click', checkoutWhatsApp);
@@ -1006,6 +1136,101 @@ function renderCart() {
       // preserve cart state, but re-render catalog responsive layout
       loadCatalog();
     }, 250));
+
+    /* -------------------------
+       ADDED JS (TIMES SCALED UP)
+       - Animates navbar links with a stagger
+       - Fades in hero cards and product cards as they appear
+       - Adds a pulse/bump to the cart when count changes
+       - Adds image shimmer until images load
+       ------------------------- */
+
+    // navbar stagger: set index CSS var, then add .ready to trigger CSS animation
+    (function animateNavbar(){
+      const nav = document.querySelector('.navbar');
+      if(!nav) return;
+      const links = nav.querySelectorAll('a');
+      links.forEach((a,i) => a.style.setProperty('--i', i));
+      // small timeout so initial styles apply (slower)
+      requestAnimationFrame(()=> setTimeout(()=> nav.classList.add('ready'), 400));
+    })();
+
+    // reveal hero .card elements (slower stagger)
+    (function revealHeroCards(){
+      const cards = document.querySelectorAll('.card');
+      cards.forEach((c, idx) => {
+        setTimeout(()=> c.classList.add('in'), 420 + idx * 200);
+      });
+    })();
+
+    // intersection observer for product cards (entrance animation)
+    const productObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if(entry.isIntersecting){
+          entry.target.classList.add('in');
+          productObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+
+    // watch catalog for inserted product cards and observe them
+    const catalogObserver = new MutationObserver((mutations) => {
+      mutations.forEach(m => {
+        m.addedNodes.forEach(node => {
+          if(!(node instanceof HTMLElement)) return;
+          // observe direct product-cards children
+          node.querySelectorAll && node.querySelectorAll('.product-card').forEach(pc => {
+            productObserver.observe(pc);
+          });
+          // also observe card elements inside the added node
+          node.querySelectorAll && node.querySelectorAll('.card').forEach(c => { setTimeout(()=> c.classList.add('in'), 180); });
+        });
+      });
+      // in case product-cards already present, ensure they are observed too
+      document.querySelectorAll('.product-card').forEach(pc => {
+        if(!pc.classList.contains('in')) productObserver.observe(pc);
+      });
+    });
+
+    if(catalogEl) {
+      catalogObserver.observe(catalogEl, { childList: true, subtree: true });
+    }
+
+    // initial observe any existing product-cards
+    document.querySelectorAll('.product-card').forEach(pc => productObserver.observe(pc));
+
+    // bump cart when count changes: use a mutation observer on the count span
+    (function cartCountBump(){
+      const count = cartToggle.querySelector('.count');
+      if(!count) return;
+      const mo = new MutationObserver(() => {
+        // bump count visually
+        count.classList.remove('bump');
+        void count.offsetWidth;
+        count.classList.add('bump');
+
+        // pulse cart container briefly
+        cartToggle.classList.remove('pulse');
+        void cartToggle.offsetWidth;
+        cartToggle.classList.add('pulse');
+
+        // remove pulse after animation (scaled)
+        setTimeout(()=> { cartToggle.classList.remove('pulse'); count.classList.remove('bump'); }, 2400);
+      });
+      mo.observe(count, { childList: true, characterData: true, subtree: true });
+    })();
+
+    // also trigger a gentle pulse on page load if cart has items (slower)
+    if (cart.length > 0) {
+      setTimeout(()=> { cartToggle.classList.add('pulse'); setTimeout(()=> cartToggle.classList.remove('pulse'), 2400); }, 1500);
+    }
+
+    // minor accessibility: respect reduced motion (already mostly handled in css)
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      // remove animations quickly if reduced-motion requested
+      document.querySelectorAll('.card, .product-card').forEach(el => { el.classList.add('in'); });
+    }
+
   </script>
 </body>
 </html>
