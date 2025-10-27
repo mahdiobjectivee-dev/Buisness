@@ -5,7 +5,7 @@
   <title>Rongtuli — Smart AI Search</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    /* ---------- Your original styles (unchanged) ---------- */
+    /* ---------- Your original styles (unchanged) + animation additions ---------- */
     body {
       font-family: "Inter", system-ui, Arial;
       background: #f6f8fb;
@@ -94,7 +94,14 @@
       overflow:auto;
       z-index: 999;
       border: 1px solid #eef4fb;
+
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 420ms cubic-bezier(.2,.9,.2,1), transform 420ms cubic-bezier(.2,.9,.2,1);
+      will-change: transform, opacity;
     }
+    .suggestions.in { opacity: 1; transform: translateY(0); }
+
     .suggestion-item {
       padding: 10px 12px;
       cursor: pointer;
@@ -103,7 +110,13 @@
       gap:8px;
       align-items:center;
       font-weight:600;
+
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 420ms cubic-bezier(.2,.9,.2,1), transform 420ms cubic-bezier(.2,.9,.2,1);
     }
+    .suggestion-item.visible { opacity: 1; transform: translateY(0); }
+
     .suggestion-item:hover, .suggestion-item.active { background:#f1f8ff; }
 
     .results {
@@ -111,7 +124,13 @@
       flex-wrap: wrap;
       gap: 12px;
       margin-top: 12px;
+
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 620ms cubic-bezier(.2,.9,.2,1), transform 620ms cubic-bezier(.2,.9,.2,1);
     }
+    .results.in { opacity: 1; transform: translateY(0); }
+
     .product-card {
       width: 220px;
       background: #fff;
@@ -122,7 +141,15 @@
       flex-direction: column;
       gap: 8px;
       cursor: pointer;
+
+      opacity: 0;
+      transform: translateY(12px) scale(.995);
+      transition: transform 620ms cubic-bezier(.2,.9,.2,1), opacity 620ms cubic-bezier(.2,.9,.2,1);
+      will-change: transform, opacity;
     }
+    .product-card.in { opacity: 1; transform: translateY(0) scale(1); }
+    .product-card.out { opacity: 0; transform: translateY(-8px) scale(.99); transition: transform 260ms linear, opacity 260ms linear; }
+
     .product-thumb {
       height: 140px;
       border-radius: 8px;
@@ -131,12 +158,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
     }
     .product-thumb img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display:block;
+      opacity: 0;
+      transform: translateY(6px) scale(.998);
+      transition: opacity 620ms cubic-bezier(.2,.9,.2,1), transform 620ms cubic-bezier(.2,.9,.2,1);
     }
+    .product-thumb img.in { opacity:1; transform: translateY(0) scale(1); }
     .product-name {
       font-weight: 800;
       color: #7092b0;
@@ -175,7 +208,12 @@
       box-shadow: 0 8px 26px rgba(16,24,40,0.06);
       color: #6b7280;
       width:100%;
+
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 420ms cubic-bezier(.2,.9,.2,1), transform 420ms cubic-bezier(.2,.9,.2,1);
     }
+    .no-results.in { opacity: 1; transform: translateY(0); }
 
     @media (max-width:720px){
       .product-card { width: calc(50% - 12px); }
@@ -219,208 +257,164 @@
   color: #415a4a;
   font-size: 1rem;
   transition: color 0.2s ease;
+  opacity: 0;
+  transform: translateY(6px);
 }
+.navbar.ready a { animation: navIn 620ms cubic-bezier(.2,.9,.2,1) forwards; }
+.navbar.ready a:nth-child(1){ animation-delay: 80ms; }
+.navbar.ready a:nth-child(2){ animation-delay: 160ms; }
+.navbar.ready a:nth-child(3){ animation-delay: 240ms; }
+@keyframes navIn { to { opacity: 1; transform: translateY(0); } }
 
-/* hover + visited fix */
-.navbar a:hover {
-  color: #2f4436;
+/* Cart styles (kept intact) + anim classes */
+:root{
+  --cart-width:340px;
+  --accent:#6aa8d6;
+  --accent-dark:#6aa8d6;
+  --muted:#7b8794;
+  --text:#7092b0;
+  --toggle-width: 92px;
+  --cart-offset-desktop: 60px;
+  --cart-offset-mobile-right: 12px;
 }
-.navbar a:visited,
-.navbar a:active,
-.navbar a:focus {
-  color: #415a4a;
-  text-decoration: none;
+#cart-toggle {
+  position: fixed;
+  right: var(--cart-offset-desktop);
+  top: 22px;
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  cursor: pointer;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  transition: all 0.18s ease;
 }
+#cart-toggle:hover { background: var(--accent-dark); transform: translateY(-2px); }
+#cart-toggle .count { background: #fff; color: var(--accent-dark); padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 12px; }
 
-/* Optional: reduce gap slightly on smaller screens */
-@media (max-width: 500px) {
-  .navbar {
-    gap: 1rem;
-    padding: 0.6rem 0.8rem;
+/* cart panel (block layout) */
+#cart {
+  position: fixed;
+  right: var(--cart-offset-desktop);
+  top: 70px;
+  width: var(--cart-width);
+  max-width: calc(100% - 40px);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+  z-index: 11000;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  display: block;
+  -webkit-overflow-scrolling: touch;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+#cart.hidden { transform: translateY(-10px) scale(0.98); opacity: 0; pointer-events: none; display: none; }
+
+#cart.anim-in { transform: translateY(0) scale(1); opacity: 1; transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms cubic-bezier(.2,.9,.2,1); }
+#cart.anim-out { transform: translateY(-8px) scale(.99); opacity: 0; transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms cubic-bezier(.2,.9,.2,1); }
+
+#cart h2 { margin: 0 0 12px 0; font-size: 18px; color: #143047; }
+#cart p { margin: 8px 0; font-weight: 700; color: #143047; }
+
+#cart-rows > .cart-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  min-height: 56px;
+}
+#cart-rows > .cart-row:last-child { border-bottom: none; margin-bottom: 0; }
+
+#cart .cart-img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; flex: 0 0 56px; background: #f2f4f6; }
+
+#cart .cart-text { flex: 1 1 auto; min-width: 0; }
+#cart .cart-text > div:first-child { font-weight: 800; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #143047; }
+#cart .cart-text > div:last-child { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+#cart .cart-controls { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex: 0 0 auto; margin-left: 8px; }
+
+.small-btn { background: transparent; border: 1px solid rgba(16,24,40,0.06); padding: 6px 8px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
+.small-btn.icon { min-width:36px; padding:6px 10px; text-align:center; }
+.small-btn:active { transform: translateY(1px); }
+
+.cart-footer { margin-top: 12px; display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.cart-footer .checkout-wrap { flex: 1 1 100%; }
+#checkout-btn { background: linear-gradient(180deg,var(--accent),var(--accent-dark)); color: white; border: none; padding: 12px 14px; border-radius: 10px; cursor: pointer; font-weight: 800; width: 70%; box-shadow: 0 8px 18px rgba(106,168,214,0.16); }
+#cart-close-footer { background: transparent; border: 1px solid rgba(16,24,40,0.08);  padding: 12px 14px;  border-radius: 10px; cursor: pointer; font-weight: 700; color: #143047; white-space: nowrap; }
+  footer{max-width:1000px;margin:28px auto;text-align:center;color:var(--muted)}
+
+#subtotal, #shipping, #total { margin: 8px 0; font-weight: 600; color: var(--muted); font-size: 14px; }
+#total { color: #143047; font-size: 16px; }
+
+@media (max-width: 900px) {
+  .product-card { width: calc(50% - 12px); }
+  #cart {
+    right: 12px;
+    width: calc(100% - 24px);
+    top: auto;
+    bottom: 90px;
   }
-  .navbar a {
-    font-size: 0.9rem;
+  #cart-toggle {
+    top: auto;
+    bottom: 22px;
+    right: var(--cart-offset-mobile-right);
+    padding: 12px 16px;
+    z-index: 13000;
+    width: var(--toggle-width);
+    justify-content: center;
   }
+  #checkout-btn { width: 100%; }
+  #cart-close-footer { width: 100%; }
+}
+@media (max-width: 420px) { .product-card { width: 100%; } }
+
+/* small cart badge bump */
+#cart-toggle.bump { animation: cartBump 700ms cubic-bezier(.2,.9,.2,1); }
+@keyframes cartBump {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.18) translateY(-3px); }
+  60% { transform: scale(.96) translateY(0); }
+  100% { transform: scale(1); }
 }
 
-footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
+/* shimmer while images load */
+.product-thumb img[data-loading="true"] {
+  opacity: 0.5;
+  transition: opacity 0.5s ease;
+}
 
-    /* ---------- Cart styles copied from your product page (kept intact) ---------- */
-    :root{
-      --card:#fff;
-      --accent:#6aa8d6;
-      --accent-dark:#6aa8d6;
-      --muted:#7b8794;
-      --text:#7092b0;
-      --radius:14px;
-      --card-radius:12px;
-      --shadow:0 8px 26px rgba(16,24,40,0.06);
-      --soft-shadow:0 6px 18px rgba(15,30,40,0.06);
-      --cart-width:340px;
+/* page-level exit */
+.page-exit .wrap,
+.page-exit .navbar,
+.page-exit .header,
+.page-exit .ai-promo,
+.page-exit #results {
+  opacity: 0;
+  transform: translateY(-8px) scale(.997);
+  transition: opacity 260ms cubic-bezier(.2,.9,.2,1), transform 260ms cubic-bezier(.2,.9,.2,1);
+}
 
-      --cart-offset-desktop: 60px;
-      --cart-offset-mobile-right: 12px;
-      --cart-offset-mobile-left: 40px;
-      --toggle-width: 92px;
-      --toggle-gap: 8px;
-    }
-
-    /* --- CART TOGGLE --- */
-    #cart-toggle {
-      position: fixed;
-      right: var(--cart-offset-desktop);
-      top: 22px;
-      background: var(--accent);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 14px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-      cursor: pointer;
-      z-index: 12000;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      border: none;
-      transition: all 0.18s ease;
-    }
-    #cart-toggle:hover { background: var(--accent-dark); transform: translateY(-2px); }
-    #cart-toggle .count { background: #fff; color: var(--accent-dark); padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 12px; }
-
-    /* cart panel (block layout) */
-    #cart {
-      position: fixed;
-      right: var(--cart-offset-desktop);
-      top: 70px;
-      width: var(--cart-width);
-      max-width: calc(100% - 40px);
-      max-height: calc(100vh - 96px);
-      overflow-y: auto;
-      overflow-x: hidden;
-      background: #fff;
-      border-radius: 14px;
-      padding: 18px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-      z-index: 11000;
-      transition: transform 0.22s ease, opacity 0.22s ease;
-      display: block;
-      -webkit-overflow-scrolling: touch;
-    }
-    #cart.hidden { transform: translateY(-10px) scale(0.98); opacity: 0; pointer-events: none; display: none; }
-
-    /* Default cart text styles */
-    #cart h2 { margin: 0 0 12px 0; font-size: 18px; color: #143047; }
-    #cart p { margin: 8px 0; font-weight: 700; color: #143047; }
-
-    /* cart rows */
-    #cart-rows > .cart-row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(0,0,0,0.06);
-      margin-bottom: 6px;
-      flex-wrap: wrap;
-      min-height: 56px;
-    }
-    #cart-rows > .cart-row:last-child { border-bottom: none; margin-bottom: 0; }
-
-    #cart .cart-img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; flex: 0 0 56px; background: #f2f4f6; }
-
-    #cart .cart-text { flex: 1 1 auto; min-width: 0; }
-    #cart .cart-text > div:first-child { font-weight: 800; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #143047; }
-    #cart .cart-text > div:last-child { font-size: 13px; color: var(--muted); margin-top: 4px; }
-
-    #cart .cart-controls { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex: 0 0 auto; margin-left: 8px; }
-
-    .small-btn { background: transparent; border: 1px solid rgba(16,24,40,0.06); padding: 6px 8px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
-    .small-btn.icon { min-width:36px; padding:6px 10px; text-align:center; }
-    .small-btn:active { transform: translateY(1px); }
-
-    /* footer layout: checkout + close button (close moved here) */
-    .cart-footer { margin-top: 12px; display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-    .cart-footer .checkout-wrap { flex: 1 1 100%; }
-    #checkout-btn { background: linear-gradient(180deg,var(--accent),var(--accent-dark)); color: white; border: none; padding: 12px 14px; border-radius: 10px; cursor: pointer; font-weight: 800; width: 70%; box-shadow: 0 8px 18px rgba(106,168,214,0.16); }
-    #cart-close-footer { background: transparent; border: 1px solid rgba(16,24,40,0.08);  padding: 12px 14px;  border-radius: 10px; cursor: pointer; font-weight: 700; color: #143047; white-space: nowrap; }
-
-    #subtotal, #shipping, #total { margin: 8px 0; font-weight: 600; color: var(--muted); font-size: 14px; }
-    #total { color: #143047; font-size: 16px; }
-
-    /* ensure no horizontal scroll inside cart */
-    #cart { overflow-y: auto; overflow-x: hidden; }
-
-    /* -------------------------- MOBILE -------------------------- */
-    @media (max-width: 900px) {
-      .top { flex-direction: column; align-items: center; }
-      .gallery, .info { width: 100%; box-sizing: border-box; }
-      .gallery img { max-height: 260px; }
-      .thumbs img { width: 60px; height: 60px; }
-
-      .add-row { flex-direction: column; align-items: stretch; }
-      .qty { justify-content: center; }
-      .btn-add { width: 100%; text-align: center; }
-
-     #cart {
-        right: 12px;
-        width: calc(100% - 24px);
-        top: auto;
-        bottom: 90px;
-      }
-      /* place toggle outside the cart on the right */
-      #cart-toggle {
-        top: auto;
-        bottom: 22px;
-        right: var(--cart-offset-mobile-right);
-        padding: 12px 16px;
-        z-index: 13000;
-        width: var(--toggle-width);
-        justify-content: center;
-      }
-
-      .cart-footer { gap: 10px; }
-      .cart-footer .checkout-wrap { flex: 1 1 100%; }
-      #checkout-btn { width: 100%; }
-      #cart-close-footer { width: 100%; }
-    }
-
-    @media (max-width: 600px) {
-      body { font-size: 15px; }
-      .wrap { padding: 0 12px; }
-      .gallery img { max-height: 200px; }
-      .thumbs img { width: 52px; height: 52px; }
-      #cart { padding: 12px; max-height: calc(100vh - 110px); }
-
-      #cart .cart-row { gap: 10px; padding: 8px 0; min-height: 48px; }
-      #cart .cart-img { width: 48px; height: 48px; flex: 0 0 48px; }
-      .small-btn { padding: 6px 6px; font-size: 12px; }
-
-      /* controls become horizontal under the text */
-      #cart .cart-controls {
-        width: 100%;
-        margin-left: 0;
-        align-items: flex-start;
-        flex-direction: row;
-        gap: 8px;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-        margin-top: 8px;
-      }
-    }
-
-    @media (max-width: 400px) {
-      .product-card { padding: 10px; }
-      .product-image { height: 120px; }
-      .btn-add { font-size: 14px; padding: 8px; }
-      #cart h2 { font-size: 16px; }
-      #cart .cart-text > div:first-child { font-size: 13px; }
-      #checkout-btn { padding: 10px 12px; font-size: 15px; }
-      #cart-close-footer { padding: 10px 12px; font-size: 14px; }
-    }
-
-    /* Helpful debug (uncomment while you test) */
-    /* #cart { outline: 2px dashed rgba(0,0,0,0.06); } */
-    /* #cart-toggle { outline: 2px dashed rgba(255,0,0,0.12); } */
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .suggestions, .results, .product-card, .product-thumb img, .no-results { opacity: 1 !important; transform: none !important; }
+  .navbar a { opacity: 1 !important; transform: none !important; }
+}
   </style>
 </head>
 <body>
@@ -582,8 +576,6 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // optional secret token if you set one on backend:
-        //'x-frontend-token': 'rongtuli123'
       },
       body: JSON.stringify({
         message: `You are a shopping assistant. Convert this user search phrase into short keyword phrases (comma-separated). Return only the keywords, no extra text.\n\n${userInput}`
@@ -591,7 +583,6 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
     });
 
     const data = await res.json();
-    // backend should return { reply: "keywords,here" } or fallback
     return data.reply || userInput;
   } catch (err) {
     console.warn('AI rewrite failed, using raw input', err);
@@ -627,7 +618,7 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
     function showSuggestions(list) {
       suggestionsEl.innerHTML = '';
       suggestionIndex = -1;
-      if (!list || list.length === 0) { suggestionsEl.style.display = 'none'; return; }
+      if (!list || list.length === 0) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); return; }
       list.forEach((s, idx) => {
         const div = document.createElement('div');
         div.className = 'suggestion-item';
@@ -640,11 +631,18 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
         div.addEventListener('click', () => {
           searchInput.value = s.text;
           suggestionsEl.style.display = 'none';
+          suggestionsEl.classList.remove('in');
           doSearch(s.text);
         });
         suggestionsEl.appendChild(div);
       });
       suggestionsEl.style.display = 'block';
+      // animate visible and stagger children
+      requestAnimationFrame(()=> {
+        suggestionsEl.classList.add('in');
+        const items = suggestionsEl.querySelectorAll('.suggestion-item');
+        items.forEach((it, i) => setTimeout(()=> it.classList.add('visible'), i * 60));
+      });
     }
 
     // keyboard navigation for suggestions
@@ -663,6 +661,7 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
     async function doSearch(q) {
       q = (q || '').trim();
       suggestionsEl.style.display = 'none';
+      suggestionsEl.classList.remove('in');
       if (!q) {
         renderResults([]);
         statusEl.textContent = 'Enter search text.';
@@ -690,7 +689,6 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
         statusEl.textContent = `No exact matches for "${q}". Showing closest alternatives.`;
         // fallback: run Fuse again with relaxed threshold and return top 6
         if (fuse) {
-          // temporarily create a new Fuse with looser threshold
           const loose = new window.Fuse(products, { keys: ['name','description','category'], threshold: 0.7 });
           const alt = loose.search(q, { limit: 12 }).map(r => r.item);
           renderNoResultsWithAlternatives(q, alt);
@@ -711,6 +709,11 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
       box.innerHTML = `<div style="font-weight:800;margin-bottom:6px">No matching items found for "<em>${escapeHtml(q)}</em>"</div>
         <div style="color:#6b7280">We found these similar items — maybe one fits:</div>`;
       resultsEl.appendChild(box);
+      // animate results container and the box
+      requestAnimationFrame(()=> {
+        resultsEl.classList.add('in');
+        box.classList.add('in');
+      });
 
       if (!alternatives || alternatives.length === 0) {
         const msg = document.createElement('div');
@@ -721,7 +724,7 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
         return;
       }
 
-      alternatives.forEach(p => {
+      alternatives.forEach((p, idx) => {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
@@ -732,21 +735,41 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
           <div class="small">${escapeHtml((p.description||'').slice(0,100))}</div>
           <button class="add-btn">Add to Cart</button>
         `;
+        // wire add + navigation with exit animation
         card.querySelector('.add-btn').addEventListener('click', e => {
-          e.stopPropagation(); addToCart(p); showToast('Added to cart');
+          e.stopPropagation(); addToCart(p); showToast('Added to cart'); triggerCartBump();
         });
-        card.addEventListener('click', () => window.location.href = `product.html?id=${p.id}`);
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          animateExitThenNavigate(`product.html?id=${p.id}`);
+        });
+
         resultsEl.appendChild(card);
+
+        // show image and card with stagger
+        const img = card.querySelector('.product-thumb img');
+        img.setAttribute('data-loading','true');
+        img.addEventListener('load', ()=> img.classList.add('in'));
+        // fallback: mark in after delay
+        setTimeout(()=> {
+          img.classList.add('in');
+          card.classList.add('in');
+        }, 220 + idx * 80);
       });
     }
 
     function renderResults(list) {
       resultsEl.innerHTML = '';
       if (!list || list.length === 0) {
-        resultsEl.innerHTML = '<div class="no-results">No matching items found. Try different words.</div>';
+        resultsEl.innerHTML = '<div class="no-results in">No matching items found. Try different words.</div>';
+        requestAnimationFrame(()=> resultsEl.classList.add('in'));
         return;
       }
-      list.forEach(p => {
+
+      // animate results container in
+      requestAnimationFrame(()=> resultsEl.classList.add('in'));
+
+      list.forEach((p, idx) => {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
@@ -763,11 +786,25 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
           e.stopPropagation();
           addToCart(p);
           showToast('Added to cart');
+          triggerCartBump();
         });
-        card.addEventListener('click', () => {
-          window.location.href = `product.html?id=${p.id}`;
+        // intercept clicks to animate exit then navigate
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          animateExitThenNavigate(`product.html?id=${p.id}`);
         });
+
         resultsEl.appendChild(card);
+
+        // show image and card with stagger
+        const img = card.querySelector('.product-thumb img');
+        img.setAttribute('data-loading','true');
+        img.addEventListener('load', ()=> img.classList.add('in'));
+        // fallback in case load event doesn't fire quickly (or placeholder)
+        setTimeout(()=> {
+          img.classList.add('in');
+          card.classList.add('in');
+        }, 220 + idx * 80);
       });
     }
 
@@ -791,15 +828,9 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
 
     /* -------------------------
        Cart logic (copied & integrated)
-       - uses localStorage 'cart'
-       - cart UI: #cart-toggle and #cart
-       - checkout opens WhatsApp with order summary
-       ------------------------- */
+    ------------------------- */
 
-    // WhatsApp checkout number (copied)
     const WHATSAPP_NUMBER = '97451707046';
-
-    // cart stored in localStorage
     let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 
     function formatPrice(n){ return 'QAR ' + (Number(n)||0).toFixed(2); }
@@ -887,20 +918,32 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
       totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping);
     }
 
-    function openCart(){
-      cartEl.classList.remove('hidden');
+    // animate cart open/close (non-destructive)
+    function animateCartOpen(){
+      cartEl.classList.remove('hidden','anim-out');
+      void cartEl.offsetWidth;
+      cartEl.classList.add('anim-in');
       cartEl.style.display = 'block';
       cartEl.setAttribute('aria-hidden','false');
       cartToggle.setAttribute('aria-expanded','true');
       cartEl.scrollTop = 0;
     }
-    function closeCart(){
-      cartEl.classList.add('hidden');
+    function animateCartClose(){
+      cartEl.classList.remove('anim-in');
+      cartEl.classList.add('anim-out');
       cartEl.setAttribute('aria-hidden','true');
       cartToggle.setAttribute('aria-expanded','false');
-      setTimeout(()=>{ if(cartEl.classList.contains('hidden')) cartEl.style.display='none'; },220);
+      setTimeout(()=> {
+        if (cartEl.classList.contains('anim-out')) {
+          cartEl.classList.add('hidden');
+          cartEl.classList.remove('anim-out');
+          cartEl.style.display = 'none';
+        }
+      }, 260);
     }
-    function toggleCart(){ if(cartEl.classList.contains('hidden')) openCart(); else closeCart(); }
+    function openCart(){ animateCartOpen(); }
+    function closeCart(){ animateCartClose(); }
+    function toggleCart(){ if(cartEl.classList.contains('hidden')) animateCartOpen(); else animateCartClose(); }
 
     cartToggle.addEventListener('click', toggleCart);
     cartCloseFooter.addEventListener('click', closeCart);
@@ -911,10 +954,11 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
         try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
         renderCart();
         updateCartCount();
+        triggerCartBump();
       }
     });
 
-    // WhatsApp checkout (copied)
+    // WhatsApp checkout
     function checkoutWhatsApp() {
       if (cart.length === 0) { alert('Cart is empty.'); return; }
       let text = 'Order request — items:\n\n';
@@ -926,10 +970,8 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
       window.open(url, '_blank');
     }
 
-    /* Override / integrate addToCart so product buttons use same cart representation
-       (keeps your product rendering unchanged, only ensures items go into the shared cart) */
+    /* addToCart used above */
     function addToCart(p) {
-      // p expected to have id, name, price, image (from your product mapping)
       let found = cart.find(i => i.id === p.id);
       if (found) {
         found.quantity = Number(found.quantity || 0) + 1;
@@ -945,7 +987,6 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
         cart.push(entry);
       }
       saveCart();
-      // open cart to show user the addition
       openCart();
     }
 
@@ -954,17 +995,15 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
 
     // wiring: search button + Enter + clear
     document.getElementById('searchBtn').addEventListener('click', () => doSearch(searchInput.value));
-    document.getElementById('clearBtn').addEventListener('click', () => { searchInput.value = ''; renderResults([]); statusEl.textContent = ''; suggestionsEl.style.display = 'none'; });
+    document.getElementById('clearBtn').addEventListener('click', () => { searchInput.value = ''; renderResults([]); statusEl.textContent = ''; suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); });
 
     // debounce user typing: suggestions and live preview
     const onType = debounce(async () => {
       const q = searchInput.value.trim();
-      if (!q) { suggestionsEl.style.display = 'none'; return; }
+      if (!q) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); return; }
       // show simple suggestions from Fuse
       const sug = getLiveSuggestions(q, 8);
       showSuggestions(sug);
-
-      // optionally live preview (small single-word queries): we won't auto-run full AI search on every keystroke
     }, 180);
 
     searchInput.addEventListener('input', onType);
@@ -977,20 +1016,21 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
         if (e.key === 'ArrowDown') moveSuggestion(1);
         else if (e.key === 'ArrowUp') moveSuggestion(-1);
         else if (e.key === 'Enter') {
-          // if suggestion active, trigger it; else do full search
           const active = suggestionsEl.querySelector('.suggestion-item.active');
           if (active) { active.click(); }
           else doSearch(searchInput.value);
-        } else if (e.key === 'Escape') { suggestionsEl.style.display = 'none'; }
+        } else if (e.key === 'Escape') { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); }
       } else if (e.key === 'Enter') {
-        // normal enter when suggestions not open
         doSearch(searchInput.value);
       }
     });
 
     // click outside closes suggestions
     document.addEventListener('click', (ev) => {
-      if (!document.querySelector('.search-bar').contains(ev.target)) suggestionsEl.style.display = 'none';
+      if (!document.querySelector('.search-bar').contains(ev.target)) {
+        suggestionsEl.style.display = 'none';
+        suggestionsEl.classList.remove('in');
+      }
     });
 
     // initial load
@@ -1001,8 +1041,49 @@ footer{max-width:1000px;margin:28px auto;text-align:center;color:#7b8794}
     renderCart();
     updateCartCount();
 
+    // small UI helpers for animation UX
+
+    // animate exit then navigate
+    function animateExitThenNavigate(href) {
+      document.documentElement.classList.add('page-exit');
+      // mark visible product cards as out quickly so the page feels responsive
+      document.querySelectorAll('.product-card').forEach(pc => pc.classList.add('out'));
+      setTimeout(()=> { window.location.href = href; }, 380);
+    }
+
+    // bump cart toggle for feedback
+    function triggerCartBump(){
+      cartToggle.classList.remove('bump');
+      void cartToggle.offsetWidth;
+      cartToggle.classList.add('bump');
+      setTimeout(()=> cartToggle.classList.remove('bump'), 900);
+    }
+
+    // enhance "Go Back" anchor to play exit animation before navigation (preserves original logic)
+    (function enhanceGoBack(){
+      const anchors = Array.from(document.querySelectorAll('.wrap a'));
+      const goBack = anchors.find(a => a.textContent && a.textContent.trim().startsWith('←'));
+      if(!goBack) return;
+      goBack.addEventListener('click', function(e){
+        e.preventDefault();
+        document.documentElement.classList.add('page-exit');
+        setTimeout(()=>{
+          try {
+            if (history.length > 1) history.back();
+            else window.location.href = 'index.html';
+          } catch(err) {
+            window.location.href = 'index.html';
+          }
+        }, 380);
+      }, { capture: true });
+    })();
+
+    // mark navbar ready to stagger links
+    requestAnimationFrame(()=> document.querySelector('.navbar') && document.querySelector('.navbar').classList.add('ready'));
+
     // expose for debugging
     window._rongtuli_search = { products, doSearch, getLiveSuggestions, cart };
+
   </script>
 </body>
 </html>
