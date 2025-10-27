@@ -65,9 +65,29 @@
   .wrap{max-width:1000px;margin:24px auto;padding:0 16px}
   .top{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;}
   .gallery{width:46%;background:var(--card);padding:12px;border-radius:12px;box-shadow:var(--shadow)}
-  .thumbs{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
-  .thumbs img{width:70px;height:70px;object-fit:cover;border-radius:8px;cursor:pointer;border:2px solid transparent;opacity:0;transform:translateY(8px) scale(.995);}
+  .thumbs{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap; position:relative;}
+  /* thumbnails: start hidden via css, they will fade in when .in is added. */
+  .thumbs img{width:70px;height:70px;object-fit:cover;border-radius:8px;cursor:pointer;border:2px solid transparent;opacity:0;transform:translateY(8px) scale(.995); transition: transform var(--anim-med) var(--easing), opacity var(--anim-med) var(--easing); }
   .thumbs img.active{border-color:var(--accent)}
+  .thumb-overlay {
+    position:absolute;
+    right:0;
+    top:0;
+    width:70px;
+    height:70px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.45);
+    color:#fff;
+    font-weight:800;
+    cursor:pointer;
+    font-size:13px;
+    user-select:none;
+  }
+  .thumbs img.in { opacity:1; transform: translateY(0) scale(1); }
+
   .info{flex:1;background:var(--card);padding:12px;border-radius:12px;box-shadow:var(--shadow);opacity:0;transform:translateY(10px);}
   .price{font-weight:800;color:var(--accent);font-size:20px;margin-top:6px}
   .add-row{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
@@ -407,6 +427,52 @@
 @keyframes shimmer { to { transform: translateX(110%); } }
 
 /* ---------------------------
+   POPUP VIEWER STYLES (centered card, matching site) 
+   --------------------------- */
+#fs-viewer {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 22000;
+}
+#fs-viewer.visible { display:flex; }
+#fs-viewer .fs-bg { position:absolute; inset:0; background: rgba(12,18,25,0.48); backdrop-filter: blur(4px); }
+#fs-viewer .fs-card {
+  position: relative;
+  width: min(880px, 94%);
+  max-height: 88vh;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 22px 60px rgba(15,30,40,0.28);
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:center;
+}
+#fs-viewer img { max-width:100%; max-height:72vh; border-radius:10px; display:block; }
+.fs-close, .fs-prev, .fs-next {
+  position: absolute;
+  background: transparent;
+  border: none;
+  color: #143047;
+  font-size: 26px;
+  cursor: pointer;
+  padding: 6px;
+  line-height: 1;
+}
+.fs-close { top: 12px; right: 12px; font-size: 24px; color:#6a7a88; }
+.fs-prev { left: 12px; top: 50%; transform: translateY(-50%); font-size:28px; color:#6a7a88; }
+.fs-next { right: 12px; top: 50%; transform: translateY(-50%); font-size:28px; color:#6a7a88; }
+
+/* thumbnail within popup (optional) */
+.fs-thumbs { display:flex; gap:8px; margin-top:12px; justify-content:center; flex-wrap:wrap; }
+.fs-thumbs img { width:64px; height:64px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid transparent; }
+.fs-thumbs img.active { border-color:var(--accent); }
+
+/* ---------------------------
    NEW: "More products" UI styles
    (keeps visual language consistent)
    --------------------------- */
@@ -445,18 +511,23 @@
 
 /* product grid for "more" */
 .more-grid {
-  display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap:12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* leave as-is */
+  gap: 12px;
+  justify-content: center; /* center the tracks so cards don't hug the edges */
+  align-items: start;
 }
 
-/* card */
+/* force cards to look like normal cards even when only one present */
 .more-card {
+  width: 220px;        /* fixed visual card width */
+  max-width: 100%;     /* keep mobile-friendly */
+  margin: 0 auto;      /* center the card inside a stretched grid cell */
   background: #fff;
   border-radius: 12px;
-  padding:10px;
+  padding: 10px;
   box-shadow: var(--soft-shadow);
-  cursor:pointer;
+  cursor: pointer;
   display:flex;
   flex-direction:column;
   gap:8px;
@@ -464,6 +535,7 @@
   opacity: 0;
   transition: transform var(--anim-med) var(--easing), opacity var(--anim-med) var(--easing);
 }
+
 .more-card.in { transform: translateY(0); opacity: 1; }
 .more-card .thumb {
   height:120px;
@@ -486,7 +558,6 @@
 }
 .more-footer .load-more:active { transform: translateY(1px); }
 
-/* error / empty */
 .more-empty { padding:12px; color:var(--muted); background:#fff; border-radius:10px; box-shadow:var(--soft-shadow); }
 
 /* reduce motion */
@@ -554,6 +625,8 @@
     </div>
   </div>
 
+  
+
   <!-- AI search promo: "Can't find what you want?" -->
 <div class="ai-promo" id="aiPromo">
   <div class="left">
@@ -578,7 +651,6 @@
         <div class="tab" data-view="trending" role="tab" tabindex="0">Trending</div>
         <div class="tab" data-view="suggested" role="tab" tabindex="0">You may like</div>
       </div>
-      <div style="color:var(--muted);font-size:13px">Everything's perfect — explore more</div>
     </div>
 
     <div id="moreGrid" class="more-grid" aria-live="polite" aria-atomic="true">
@@ -591,6 +663,17 @@
   </div>
 
   <footer id="foot">© <span id="year"></span> Rongtuli</footer>
+
+  <!-- POPUP VIEWER MARKUP -->
+  <div id="fs-viewer" aria-hidden="true" role="dialog" aria-label="Image viewer">
+    <div class="fs-bg" tabindex="-1"></div>
+    <div class="fs-card" role="document">
+      <button class="fs-close" aria-label="Close viewer">✕</button>
+      <button class="fs-prev" aria-label="Previous image">‹</button>
+      <img id="fs-img" alt="Product image in popup" src="" />
+      <button class="fs-next" aria-label="Next image">›</button>
+    </div>
+  </div>
 
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
@@ -739,7 +822,7 @@
         function checkoutWhatsApp() { if (cart.length === 0) { alert('Cart is empty.'); return; } let text = 'Order request — items:\n\n'; cart.forEach(it => text += `${it.name} — QAR ${it.price} × ${it.quantity}\n`); const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0); const shipping = subtotal > 0 ? 10 : 0; text += `\nSubtotal: QAR ${subtotal.toFixed(2)}\nShipping: QAR ${shipping.toFixed(2)}\nTotal: QAR ${(subtotal+shipping).toFixed(2)}`; const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`; window.open(url, '_blank'); }
 
 
-    // Product loader (same as before)
+    // Product loader (same as before), thumbnails limited to 3 + overlay + popup viewer
     async function loadProduct(){
       const urlParams = new URLSearchParams(window.location.search);
       const id = urlParams.get('id');
@@ -751,6 +834,7 @@
       const images = (p.image_urls && p.image_urls.length) ? p.image_urls : [''];
       const mainImg = images[0] || '';
 
+      // render but only show up to 3 thumbnails; add overlay if more
       const html = `
         <div class="top">
           <div class="gallery">
@@ -758,7 +842,8 @@
               <img id="main-img" class="main-img product-image" src="${escapeHtml(mainImg)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"/>
             </div>
             <div class="thumbs" id="thumbs">
-              ${images.map((u,i)=>`<img src="${escapeHtml(u)}" class="${i===0 ? 'active':''}" data-i="${i}" />`).join('')}
+              ${images.slice(0,3).map((u,i)=>`<img src="${escapeHtml(u)}" class="${i===0 ? 'active':''}" data-i="${i}" />`).join('')}
+              ${images.length > 3 ? `<div class="thumb-overlay" id="thumb-overlay">+${images.length - 3}</div>` : ''}
             </div>
           </div>
           <div class="info">
@@ -780,15 +865,14 @@
       `;
       document.getElementById('product-area').innerHTML = html;
 
-      // thumbnails
+      // thumbnails - behavior: click updates main image (preserving shimmer), animate reveal by adding .in (do NOT set inline opacity)
       const thumbs = document.querySelectorAll('#thumbs img');
       thumbs.forEach((img, idx) => {
-        // initially set loading state & staggered reveal
-        img.style.opacity = '0';
-        img.style.transform = 'translateY(8px) scale(.995)';
+        // add small staggered reveal (do not set inline opacity - keep CSS-controlled)
         setTimeout(()=> img.classList.add('in'), 160 + idx * 80);
 
-        img.addEventListener('click', () => {
+        img.addEventListener('click', (ev) => {
+          ev.preventDefault();
           document.querySelectorAll('#thumbs img').forEach(x => x.classList.remove('active'));
           img.classList.add('active');
           const main = document.getElementById('main-img');
@@ -796,19 +880,39 @@
           // small delay to allow exit transition
           setTimeout(()=> {
             main.src = img.src;
+            main.dataset.index = idx; // track index among visible thumbs
             // mark loading shimmer while new image loads
             main.setAttribute('data-loading','true');
           }, 80);
         });
+
+        // (no dblclick) thumbnails only update main image on click
       });
+
+      // overlay opens popup with full images list
+      const overlay = document.getElementById('thumb-overlay');
+      if(overlay){
+        overlay.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          openFs(0); // open viewer starting at first image
+        });
+      }
 
       // main image: handle load -> show
       const mainImgEl = document.getElementById('main-img');
       mainImgEl.setAttribute('data-loading','true');
+      mainImgEl.dataset.index = 0;
       mainImgEl.addEventListener('load', ()=>{
         mainImgEl.removeAttribute('data-loading');
         // entrance
         setTimeout(()=> mainImgEl.classList.add('in'), 80);
+      });
+
+      // clicking main image opens popup (single click)
+      mainImgEl.addEventListener('click', () => {
+        // find current index if available; otherwise 0
+        const idx = Number(mainImgEl.dataset.index || 0);
+        openFs(idx);
       });
 
       // info area entrance
@@ -834,6 +938,73 @@
 
       // initialize the "more" pane after product loaded
       initMorePanel();
+
+      // store images array for viewer usage
+      window.__productImages = images.slice(); // clone
+    }
+
+    // --- POPUP VIEWER LOGIC ---
+    const fsViewer = document.getElementById('fs-viewer');
+    const fsImg = document.getElementById('fs-img');
+    const fsCloseBtn = fsViewer.querySelector('.fs-close');
+    const fsPrevBtn = fsViewer.querySelector('.fs-prev');
+    const fsNextBtn = fsViewer.querySelector('.fs-next');
+    let fsCurrent = 0;
+
+    function openFs(index = 0){
+      const imgs = window.__productImages || [''];
+      if(!imgs || imgs.length === 0) return;
+      fsCurrent = index || 0;
+      if(fsCurrent < 0) fsCurrent = 0;
+      if(fsCurrent >= imgs.length) fsCurrent = imgs.length - 1;
+      fsImg.src = imgs[fsCurrent] || '';
+      fsViewer.classList.add('visible');
+      fsViewer.setAttribute('aria-hidden','false');
+      // focus for keyboard controls
+      fsCloseBtn.focus();
+      document.addEventListener('keydown', fsKeyHandler);
+    }
+    function closeFs(){
+      fsViewer.classList.remove('visible');
+      fsViewer.setAttribute('aria-hidden','true');
+      fsImg.src = '';
+      document.removeEventListener('keydown', fsKeyHandler);
+    }
+    function showFs(i){
+      const imgs = window.__productImages || [''];
+      if(imgs.length === 0) return;
+      fsCurrent = (i + imgs.length) % imgs.length;
+      fsImg.src = imgs[fsCurrent] || '';
+    }
+    function fsKeyHandler(e){
+      if(e.key === 'Escape'){ closeFs(); return; }
+      if(e.key === 'ArrowLeft'){ showFs(fsCurrent - 1); return; }
+      if(e.key === 'ArrowRight'){ showFs(fsCurrent + 1); return; }
+    }
+    fsCloseBtn.addEventListener('click', closeFs);
+    fsPrevBtn.addEventListener('click', ()=> showFs(fsCurrent - 1));
+    fsNextBtn.addEventListener('click', ()=> showFs(fsCurrent + 1));
+    // click outside card closes (on background)
+    fsViewer.querySelector('.fs-bg').addEventListener('click', closeFs);
+
+    // Expose minimal addToCart for quick interactions (used by more-grid)
+    function addToCart(p) {
+      let found = cart.find(i => i.id === p.id);
+      if (found) {
+        found.quantity = Number(found.quantity || 0) + 1;
+      } else {
+        cart.push({
+          id: p.id,
+          name: p.name || 'Product',
+          price: Number(p.price) || 0,
+          quantity: 1,
+          image: p.image || '',
+          link: `product.html?id=${p.id}`
+        });
+      }
+      saveCart();
+      // show cart briefly if you want:
+      // openCart();
     }
 
     function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','/':'&#x2F;'}[c])); }
@@ -1089,26 +1260,6 @@
       }, 1200);
     }
 
-    // Expose minimal addToCart for quick interactions
-    function addToCart(p) {
-      let found = cart.find(i => i.id === p.id);
-      if (found) {
-        found.quantity = Number(found.quantity || 0) + 1;
-      } else {
-        cart.push({
-          id: p.id,
-          name: p.name || 'Product',
-          price: Number(p.price) || 0,
-          quantity: 1,
-          image: p.image || '',
-          link: `product.html?id=${p.id}`
-        });
-      }
-      saveCart();
-      // show cart briefly if you want:
-      // openCart();
-    }
-
     // Initialize more panel once product is loaded
     function initMorePanel(){
       // default tab = category
@@ -1133,92 +1284,6 @@
       document.querySelectorAll('.more-card').forEach(c => c.classList.add('in'));
     }
 
-      // Add this to the end of your script (search.html)
-(function handlePageRestore() {
-  // Runs when the page is restored from back/forward cache or shown again.
-  window.addEventListener('pageshow', (event) => {
-    // Remove exit/animation classes that hide page when navigating back
-    document.documentElement.classList.remove('page-exit');
-
-    // If you used any anim-out classes on elements, remove them too:
-    document.querySelectorAll('.product-card.out').forEach(el => el.classList.remove('out'));
-    // Remove cart anim classes if left behind
-    const cartEl = document.getElementById('cart');
-    if (cartEl) {
-      cartEl.classList.remove('anim-out');
-      // If cart was hidden but should be hidden, keep it; otherwise re-hide properly
-      if (cartEl.classList.contains('hidden')) {
-        cartEl.style.display = 'none';
-      } else {
-        cartEl.style.display = 'block';
-      }
-    }
-
-    const suggestionsEl = document.getElementById('suggestions');
-    if (suggestionsEl) {
-      suggestionsEl.style.display = 'none';
-      suggestionsEl.classList.remove('in');
-      // remove any item-level visible classes
-      suggestionsEl.querySelectorAll('.suggestion-item.visible, .suggestion-item.active')
-        .forEach(it => it.classList.remove('visible', 'active'));
-    }
-
-    // Restore results area visual state
-    const resultsEl = document.getElementById('results');
-    if (resultsEl) {
-      resultsEl.classList.remove('in');
-      // small deferred re-add so entrance anim can play on restore if desired
-      // but only if the content exists
-      if (resultsEl.children.length) {
-        // re-add in on next frame so CSS transitions run
-        requestAnimationFrame(() => resultsEl.classList.add('in'));
-      } else {
-        // if empty, ensure it's visible (in case CSS hid it)
-        resultsEl.style.opacity = '';
-        resultsEl.style.transform = '';
-      }
-    }
-
-    try {
-      // reload cart from storage to be safe
-      cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    } catch (err) { cart = []; }
-    renderCart && typeof renderCart === 'function' && renderCart();
-    updateCartCount && typeof updateCartCount === 'function' && updateCartCount();
-
-    
-    if ((!window.products || !window.products.length) && typeof loadProducts === 'function') {
-      loadProducts().catch(() => {/* ignore */});
-    } else {
-      if (!window.fuse && typeof window.Fuse !== 'undefined' && typeof loadFuse === 'function') {
-        // attempt to re-create fuse quickly
-        try {
-          window.fuse = new window.Fuse(window.products || [], {
-            includeScore: true,
-            shouldSort: true,
-            threshold: 0.45,
-            keys: [
-              { name: 'name', weight: 0.5 },
-              { name: 'description', weight: 0.3 },
-              { name: 'category', weight: 0.1 },
-              { name: 'sku', weight: 0.1 }
-            ]
-          });
-        } catch (e) { /* ignore */ }
-      }
-    }
-
-    const nav = document.querySelector('.navbar');
-    if (nav) {
-      nav.classList.remove('ready');
-      requestAnimationFrame(() => nav.classList.add('ready'));
-    }
-  });
-})();
-
-
-
   </script>
 </body>
 </html>
-
