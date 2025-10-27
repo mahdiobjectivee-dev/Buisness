@@ -12,10 +12,10 @@
     *{box-sizing:border-box}
     body{font-family:Inter,system-ui,Arial;margin:0;background:var(--bg);color:#143047;padding:18px}
     .container{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-
+    /* Top center logo */
     .top-logo{display:flex;justify-content:center;align-items:center;margin-top:4px}
     .top-logo img{max-height:90px;width:auto}
-
+    /* Form card */
     .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow)}
     .form-row{display:flex;gap:12px;flex-wrap:wrap}
     input,textarea,select{padding:10px;border-radius:10px;border:1px solid #eef6fb;background:#fff;font-size:14px}
@@ -28,6 +28,7 @@
     .grid{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
     @media(max-width:980px){ .grid{grid-template-columns:1fr} .sidebar{order:2} .main{order:1} }
 
+    /* category blocks */
     .category-block{margin-top:12px}
     .category-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
     .category-title{font-weight:900;font-size:16px}
@@ -41,15 +42,19 @@
     .product-card .meta{font-size:13px;color:#6b7280}
     .product-actions{display:flex;gap:6px;margin-top:auto}
 
+    /* see all link */
     .see-all{background:transparent;border:0;color:var(--accent);cursor:pointer;font-weight:800}
 
+    /* create category area at end */
     .create-category{margin-top:16px;display:flex;gap:8px;align-items:center}
 
+    /* modal */
     .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center;z-index:12000}
     .modal{background:var(--card);padding:16px;border-radius:12px;width:800px;max-width:96%;box-shadow:0 30px 80px rgba(2,6,23,0.3)}
     .modal .thumbs{display:flex;gap:8px;flex-wrap:wrap}
     .thumbs img{width:72px;height:72px;object-fit:cover;border-radius:8px}
 
+    /* login overlay (unchanged look & behavior) */
     .auth-overlay{position:fixed;inset:0;background:#f6f8fb;display:flex;align-items:center;justify-content:center;z-index:14000}
     .auth-wrapper{width:780px;max-width:94%;background:var(--card);border-radius:14px;box-shadow:0 30px 80px rgba(2,6,23,0.08);display:flex;gap:24px;overflow:hidden}
     .auth-left{width:320px;padding:28px;display:flex;align-items:center;justify-content:center;border-right:1px solid #eef6fb}
@@ -62,6 +67,7 @@
     .secondary{margin-top:8px;background:transparent;border:1px solid #eef6fb;color:#143047;padding:10px;border-radius:10px;cursor:pointer}
     .help{margin-top:10px;color:var(--muted-2);font-size:13px}
 
+    /* search input style */
     .search-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
     .search-row input{flex:1;padding:10px;border-radius:10px;border:1px solid #e6eef7}
     .search-count{font-weight:700;color:var(--muted-2);margin-left:8px}
@@ -156,6 +162,9 @@
           </div>
         </div>
       </div>
+
+     
+
 
       <!-- Main grid: left is categories & products, right is sidebar -->
       <div class="grid">
@@ -266,22 +275,26 @@
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
+    // your supabase config (unchanged)
    const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
-
+   
+   
     const BUCKET = 'product-images';
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // DOM
     const authOverlay = document.getElementById('auth-overlay');
     const appRoot = document.getElementById('appRoot');
     const btnSignin = document.getElementById('btn-signin');
     const authEmail = document.getElementById('auth-email');
     const authPassword = document.getElementById('auth-password');
-    const btnLogout = document.getElementById('btn-logout'); 
+    const btnLogout = document.getElementById('btn-logout'); // visible in UI
     const btnGuest = document.getElementById('btn-guest');
     document.getElementById('year').textContent = new Date().getFullYear();
 
+    // create form
     const categorySelect = document.getElementById('p-category-select');
     const categoryManual = document.getElementById('p-category-manual');
     const btnCreateLocalCat = document.getElementById('btn-create-category-inline');
@@ -289,6 +302,7 @@
     const btnClear = document.getElementById('btn-clear');
     const createMsg = document.getElementById('create-msg');
 
+    // categories & lists
     const categoriesContainer = document.getElementById('categories-container');
     const categoriesListSidebar = document.getElementById('categories-list-sidebar');
     const btnAddCategory = document.getElementById('btn-add-category');
@@ -296,6 +310,7 @@
 
     const btnRefresh = document.getElementById('refresh-list');
 
+    // modal
     const modalBackdrop = document.getElementById('modalBackdrop');
     const modalClose = document.getElementById('modalClose');
     const btnSaveEdit = document.getElementById('btn-save-edit');
@@ -312,23 +327,27 @@
     const editImg2 = document.getElementById('edit-img2');
     const editImg3 = document.getElementById('edit-img3');
 
+    // search elements
     const adminSearch = document.getElementById('adminSearch');
     const adminSearchClear = document.getElementById('adminSearchClear');
     const searchCount = document.getElementById('searchCount');
 
     const LS_CATS_KEY = 'rongtuli_admin_categories_v1';
     let currentEdit = null;
-    let allProducts = null; 
-    let currentSearchQuery = ''; 
+    let allProducts = null; // cached copy of products
+    let currentSearchQuery = ''; // current search term
 
+    // helpers
     function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','/':'&#x2F;'}[c])); }
     function toast(t){ const el = document.createElement('div'); el.textContent=t; Object.assign(el.style,{position:'fixed',bottom:'20px',left:'50%',transform:'translateX(-50%)',background:'#143047',color:'#fff',padding:'8px 12px',borderRadius:'8px',zIndex:15000}); document.body.appendChild(el); setTimeout(()=>el.remove(),1600); }
 
+    // debounce helper
     function debounce(fn, wait=220){
       let t;
       return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), wait); };
     }
 
+    // auth flow (show overlay until signed in)
     async function checkSession(){
       const { data } = await supabase.auth.getSession();
       if(data?.session){
@@ -355,14 +374,15 @@
       toast('Signed in');
     });
 
+    // LOGOUT handler (new) — signs out and resets UI/cache
     btnLogout.addEventListener('click', async () => {
       try {
         await supabase.auth.signOut();
       } catch (err) {
-
+        // signOut might throw for network reasons; still try to clear UI
         console.warn('signOut error', err);
       }
-
+      // Reset client-side state and show login overlay
       allProducts = null;
       currentSearchQuery = '';
       adminSearch.value = '';
@@ -372,9 +392,11 @@
       toast('Signed out');
     });
 
+    // categories local storage helpers
     function loadLocalCategories(){ try{ return JSON.parse(localStorage.getItem(LS_CATS_KEY)||'[]'); }catch(e){return[]} }
     function saveLocalCategories(arr){ localStorage.setItem(LS_CATS_KEY, JSON.stringify(Array.from(new Set(arr.map(s=>s.trim()).filter(Boolean))))); }
 
+    // fetch & cache all products
     async function fetchAllProducts(){
       const { data, error } = await supabase.from('products').select('*').order('created_at',{ascending:false});
       if(error){ throw error; }
@@ -382,8 +404,9 @@
       return allProducts;
     }
 
+    // build categories from products + local
     async function buildCategoriesFromProducts(){
-
+      // ensure allProducts is loaded
       if(!allProducts) await fetchAllProducts();
       const counts = {};
       (allProducts || []).forEach(p => {
@@ -395,6 +418,7 @@
       return { categories: Array.from(all).sort((a,b)=>a.localeCompare(b)), counts };
     }
 
+    // filter helper
     function matchesQuery(p, q){
       if(!q) return true;
       q = q.trim().toLowerCase();
@@ -402,20 +426,24 @@
       return fields.toLowerCase().indexOf(q) !== -1;
     }
 
+    // render categories & products grouped view
+    // shows up to previewLimit items per category; "See all" toggles full view in-place
     async function renderCategoriesView(previewLimit = 4, searchQuery = ''){
       categoriesContainer.innerHTML = '';
       categoriesContainer.appendChild(document.createElement('div')).textContent = 'Loading…';
 
       try {
-
+        // ensure we have cached products
         if(!allProducts) await fetchAllProducts();
       } catch(err){
         categoriesContainer.innerHTML = `<div style="color:#b91c1c">Error loading products: ${err.message}</div>`;
         return;
       }
 
+      // apply search to produce filtered product list
       const filteredProducts = (allProducts || []).filter(p => matchesQuery(p, searchQuery));
 
+      // compute category list from filtered products + local categories (ensures creation UI still shows local cats)
       const counts = {};
       filteredProducts.forEach(p => {
         const c = (p.category || '').trim();
@@ -427,6 +455,7 @@
 
       categoriesContainer.innerHTML = '';
 
+      // show search title if searching
       if(searchQuery){
         const searchHeader = document.createElement('div');
         searchHeader.className = 'card';
@@ -439,48 +468,85 @@
         searchCount.textContent = '';
       }
 
+      // for each category create block, but only if category has items (when searching we skip zero-count categories)
       for(const cat of categories){
         const catCount = counts[cat] || 0;
-        if(searchQuery && catCount === 0) continue; 
+        if(searchQuery && catCount === 0) continue; // skip empty categories during search
 
         const catBlock = document.createElement('div'); catBlock.className = 'category-block card';
         const header = document.createElement('div'); header.className = 'category-header';
         const left = document.createElement('div'); left.innerHTML = `<div class="category-title">${escapeHtml(cat)}</div><div class="category-meta">${catCount||0} items</div>`;
         const right = document.createElement('div'); right.className = 'category-actions';
 
+        // rename button
         const renameBtn = document.createElement('button'); renameBtn.className='btn btn-ghost'; renameBtn.textContent='Rename';
         renameBtn.addEventListener('click', async ()=>{
           const newName = prompt('Rename category (updates all products using it)', cat);
           if(!newName || !newName.trim() || newName.trim()===cat) return;
           const { error } = await supabase.from('products').update({ category: newName.trim() }).eq('category', cat);
           if(error) return toast('Rename failed: '+error.message);
-
+          // update local category list
           const localCats = loadLocalCategories().map(c=> c===cat ? newName.trim() : c);
           if(!localCats.includes(newName.trim())) localCats.push(newName.trim());
           saveLocalCategories(localCats);
-          await reloadAll(); 
+          await reloadAll(); // refresh cache + UI
           toast('Category renamed');
         });
 
+        // delete button
         const delBtn = document.createElement('button'); delBtn.className='btn btn-ghost'; delBtn.textContent='Delete';
-        delBtn.addEventListener('click', async ()=>{
-          if(!confirm(`Delete category "${cat}"? Products will be moved to "Explore More".`)) return;
-          const { error } = await supabase.from('products').update({ category: 'Explore More' }).eq('category', cat);
-          if(error) return toast('Delete failed: '+error.message);
-          saveLocalCategories(loadLocalCategories().filter(c=>c!==cat));
-          await reloadAll();
-          toast('Category deleted');
-        });
+       delBtn.addEventListener('click', async ()=> {
+  if(!confirm(`Delete category "${cat}" and ALL products in it permanently (including images)? This cannot be undone.`)) return;
+
+  try {
+    // fetch the products to delete so we can remove images
+    const { data: productsToDelete, error: fetchErr } = await supabase
+      .from('products').select('id, image_urls').eq('category', cat);
+    if (fetchErr) throw fetchErr;
+
+    // collect filenames from public URLs (adjust selector if your URLs are structured differently)
+    const toRemove = [];
+    productsToDelete.forEach(p => {
+      (p.image_urls || []).forEach(url => {
+        try {
+          const parts = url.split('/');
+          const filename = decodeURIComponent(parts[parts.length - 1].split('?')[0] || '');
+          if (filename) toRemove.push(filename);
+        } catch(e) { /* ignore parse errors */ }
+      });
+    });
+
+    // remove files from storage (if any)
+    if (toRemove.length) {
+      const { error: rmErr } = await supabase.storage.from(BUCKET).remove(toRemove);
+      if (rmErr) console.warn('Storage removal error (continuing):', rmErr);
+    }
+
+    // now delete products rows
+    const { error: delErr } = await supabase.from('products').delete().eq('category', cat);
+    if (delErr) throw delErr;
+
+    // update local categories and UI
+    saveLocalCategories(loadLocalCategories().filter(c => c !== cat));
+    await reloadAll();
+    toast('Category, products and images deleted');
+  } catch (err) {
+    toast('Delete failed: ' + (err.message || err));
+    console.error(err);
+  }
+});
 
         right.appendChild(renameBtn);
         right.appendChild(delBtn);
         header.appendChild(left); header.appendChild(right);
         catBlock.appendChild(header);
 
+        // get products for this category (from full product list, then filter)
         const items = filteredProducts.filter(p => (p.category||'').trim() === cat);
         const productsRow = document.createElement('div'); productsRow.className = 'products-row';
         const showCount = Math.min(previewLimit, items.length);
 
+        // create product cards (preview)
         for(let i=0;i<showCount;i++){
           const p = items[i];
           const card = makeProductCard(p);
@@ -488,19 +554,20 @@
         }
         catBlock.appendChild(productsRow);
 
+        // if more than previewLimit show See all button
         if(items.length > previewLimit){
           const seeAllBtn = document.createElement('button'); seeAllBtn.className='see-all'; seeAllBtn.textContent = `See all (${items.length})`;
           let expanded = false;
           seeAllBtn.addEventListener('click', ()=>{
             expanded = !expanded;
             if(expanded){
-
+              // append remaining product cards
               for(let i=previewLimit;i<items.length;i++){
                 productsRow.appendChild(makeProductCard(items[i]));
               }
               seeAllBtn.textContent = 'Show less';
             } else {
-
+              // collapse back to previewLimit
               while(productsRow.children.length > previewLimit) productsRow.removeChild(productsRow.lastChild);
               seeAllBtn.textContent = `See all (${items.length})`;
               window.scrollTo({top: catBlock.offsetTop - 80, behavior: 'smooth'});
@@ -512,12 +579,14 @@
         categoriesContainer.appendChild(catBlock);
       }
 
+      // if there are no categories or no results
       if(categories.length === 0 || (searchQuery && filteredProducts.length === 0)){
         const no = document.createElement('div'); no.className='card';
         no.innerHTML = `<div class="muted">${ searchQuery ? `No results for "${escapeHtml(searchQuery)}"` : 'No categories yet. Create one below.'}</div>`;
         categoriesContainer.appendChild(no);
       }
 
+      // final: update sidebar list & selects
       categoriesListSidebar.innerHTML = '';
       const { categories: catList, counts: globalCounts } = await buildCategoriesFromProducts();
       for(const c of catList){
@@ -526,6 +595,7 @@
         categoriesListSidebar.appendChild(el);
       }
 
+      // repopulate category selects (full set — not filtered)
       editCategorySelect.innerHTML = '<option value="">— Select category —</option>';
       categorySelect.innerHTML = '<option value="">— Select category —</option>';
       for(const c of catList){
@@ -538,6 +608,7 @@
       editCategorySelect.appendChild(createNewOpt.cloneNode(true));
     }
 
+    // helper to build product card DOM element
     function makeProductCard(p){
       const card = document.createElement('div'); card.className='product-card';
       const img = document.createElement('img'); img.src = (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : 'https://via.placeholder.com/300x200?text=No+Image';
@@ -559,13 +630,14 @@
         const { error } = await supabase.from('products').delete().eq('id', p.id);
         if(error) return toast('Delete failed: '+error.message);
         toast('Deleted');
-        await reloadAll(); 
+        await reloadAll(); // refresh cache + UI with current search preserved
       });
       actions.appendChild(editBtn); actions.appendChild(delBtn);
       card.appendChild(actions);
       return card;
     }
 
+    // open edit modal (fills fields)
     function openEditModal(product){
       currentEdit = product;
       editMsg.textContent = '';
@@ -580,6 +652,7 @@
       modalBackdrop.style.display = 'flex';
     }
 
+    // modal handlers
     modalClose.addEventListener('click', ()=> { modalBackdrop.style.display='none'; currentEdit=null; });
     btnCancelEdit.addEventListener('click', ()=> { modalBackdrop.style.display='none'; currentEdit=null; });
 
@@ -621,6 +694,7 @@
       toast('Product updated');
     });
 
+    // create product flow
     btnCreate.addEventListener('click', async ()=>{
       createMsg.textContent=''; createMsg.style.color='';
       const name = (document.getElementById('p-name').value||'').trim();
@@ -657,6 +731,7 @@
 
     btnClear.addEventListener('click', ()=>{ ['p-name','p-category-manual','p-sku','p-price','p-stock','p-desc','img1','img2','img3'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); createMsg.textContent=''; });
 
+    // create local category
     btnAddCategory.addEventListener('click', async ()=>{
       const name = (newCategoryNameInput.value||'').trim();
       if(!name) return toast('Category name required');
@@ -675,6 +750,7 @@
       toast('Category added locally');
     });
 
+    // reload all: refresh cached products then render with current search
     async function reloadAll(){
       try {
         await fetchAllProducts();
@@ -684,13 +760,17 @@
       }
     }
 
+    // initial loadAll wrapper
     async function loadAll(){ await reloadAll(); }
 
     btnRefresh.addEventListener('click', ()=> loadAll());
 
+    // CSV placeholders
     document.getElementById('btn-export').addEventListener('click', ()=> toast('CSV export placeholder'));
     document.getElementById('btn-import').addEventListener('click', ()=> toast('CSV import placeholder'));
 
+    // ---------------- SEARCH wiring ----------------
+    // debounce search for live typing
     const doSearchDebounced = debounce(async (q)=>{
       currentSearchQuery = q || '';
       await renderCategoriesView(4, currentSearchQuery);
@@ -701,6 +781,7 @@
       doSearchDebounced(q);
     });
 
+    // Enter triggers immediate search
     adminSearch.addEventListener('keydown', (e)=>{
       if(e.key === 'Enter'){
         e.preventDefault();
@@ -717,6 +798,7 @@
       await renderCategoriesView(4, '');
     });
 
+    // ensure search state preserved after edits/creates/deletes (reloadAll already uses currentSearchQuery)
   </script>
 </body>
 </html>
