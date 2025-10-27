@@ -42,15 +42,45 @@
 
   /* grid of all products: responsive, no big gaps */
   .products-grid {
-    display: grid;
-    gap: 18px;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+  opacity: 0;
+  transform: translateY(8px);
+}
 
-    /* start slightly hidden for page enter */
-    opacity: 0;
-    transform: translateY(8px);
+/* 2 per row on mobile (portrait phones like 375px–480px) */
+@media (max-width: 600px) {
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 0 6px;
   }
+
+  .product-card {
+    padding: 12px;
+  }
+
+  .product-image {
+    height: 120px;
+  }
+
+  .product-name {
+    font-size: 13px;
+    max-width: 100%;
+  }
+
+  .product-price {
+    font-size: 14px;
+  }
+
+  .add-btn {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+}
+
   .products-grid.in {
     opacity: 1;
     transform: translateY(0);
@@ -414,6 +444,65 @@
 
   /* Helpful debugging utility (uncomment while testing) */
   /* #cart { outline: 2px dashed rgba(255,0,0,0.15); } */
+/* AI search promo block (place before footer) */
+.ai-promo {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  margin: 28px auto;
+  box-shadow: 0 10px 30px rgba(16,24,40,0.06);
+  max-width: 970px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #eef6fb;
+
+  /* start hidden until product content has animated in */
+  opacity: 0;
+  transform: translateY(8px);
+}
+.ai-promo.in { opacity: 1; transform: translateY(0); transition: opacity var(--anim-med) var(--easing), transform var(--anim-med) var(--easing); }
+
+.ai-promo .left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.ai-promo .left .icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background:#6aa7d628;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #7092b0;
+  font-size: 20px;
+  transform-origin: center;
+  animation: aiPulse var(--anim-slow) var(--easing) infinite;
+}
+
+@keyframes aiPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.94; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.ai-promo h3 { margin: 0; font-size: 16px; font-weight: 800; color:#7092b0; }
+.ai-promo p { margin: 2px 0 0 0; color:var(--muted); font-size:13px; }
+.ai-promo .ai-btn {
+  background: #6aa8d6;
+  color: #fff;
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(106,168,214,0.16);
+}
+
 
 </style>
 
@@ -690,93 +779,6 @@
     // ensure cart anim state correct if items exist
     if (!cartEl.classList.contains('hidden')) cartEl.classList.add('anim-in');
 
-
-      // Add this to the end of your script (search.html)
-(function handlePageRestore() {
-  // Runs when the page is restored from back/forward cache or shown again.
-  window.addEventListener('pageshow', (event) => {
-    // Remove exit/animation classes that hide page when navigating back
-    document.documentElement.classList.remove('page-exit');
-
-    // If you used any anim-out classes on elements, remove them too:
-    document.querySelectorAll('.product-card.out').forEach(el => el.classList.remove('out'));
-    // Remove cart anim classes if left behind
-    const cartEl = document.getElementById('cart');
-    if (cartEl) {
-      cartEl.classList.remove('anim-out');
-      // If cart was hidden but should be hidden, keep it; otherwise re-hide properly
-      if (cartEl.classList.contains('hidden')) {
-        cartEl.style.display = 'none';
-      } else {
-        cartEl.style.display = 'block';
-      }
-    }
-
-    const suggestionsEl = document.getElementById('suggestions');
-    if (suggestionsEl) {
-      suggestionsEl.style.display = 'none';
-      suggestionsEl.classList.remove('in');
-      // remove any item-level visible classes
-      suggestionsEl.querySelectorAll('.suggestion-item.visible, .suggestion-item.active')
-        .forEach(it => it.classList.remove('visible', 'active'));
-    }
-
-    // Restore results area visual state
-    const resultsEl = document.getElementById('results');
-    if (resultsEl) {
-      resultsEl.classList.remove('in');
-      // small deferred re-add so entrance anim can play on restore if desired
-      // but only if the content exists
-      if (resultsEl.children.length) {
-        // re-add in on next frame so CSS transitions run
-        requestAnimationFrame(() => resultsEl.classList.add('in'));
-      } else {
-        // if empty, ensure it's visible (in case CSS hid it)
-        resultsEl.style.opacity = '';
-        resultsEl.style.transform = '';
-      }
-    }
-
-    try {
-      // reload cart from storage to be safe
-      cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    } catch (err) { cart = []; }
-    renderCart && typeof renderCart === 'function' && renderCart();
-    updateCartCount && typeof updateCartCount === 'function' && updateCartCount();
-
-    
-    if ((!window.products || !window.products.length) && typeof loadProducts === 'function') {
-      loadProducts().catch(() => {/* ignore */});
-    } else {
-      if (!window.fuse && typeof window.Fuse !== 'undefined' && typeof loadFuse === 'function') {
-        // attempt to re-create fuse quickly
-        try {
-          window.fuse = new window.Fuse(window.products || [], {
-            includeScore: true,
-            shouldSort: true,
-            threshold: 0.45,
-            keys: [
-              { name: 'name', weight: 0.5 },
-              { name: 'description', weight: 0.3 },
-              { name: 'category', weight: 0.1 },
-              { name: 'sku', weight: 0.1 }
-            ]
-          });
-        } catch (e) { /* ignore */ }
-      }
-    }
-
-    const nav = document.querySelector('.navbar');
-    if (nav) {
-      nav.classList.remove('ready');
-      requestAnimationFrame(() => nav.classList.add('ready'));
-    }
-  });
-})();
-
-
-
   </script>
 </body>
 </html>
-
