@@ -786,30 +786,18 @@ body::before{
 
 
 
-/* Floating currency button */
-#currency-float-btn {
-  position: fixed;
-  right: 21px;
-  bottom: 550px; /* just below cart */
-  background: linear-gradient(180deg,var(--accent),var(--accent-dark));
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 10px 18px;
+#currency-link {
   font-weight: 700;
-  box-shadow: 0 6px 18px rgba(16,24,40,0.18);
-  cursor: pointer;
-z-index: 800;
-  transition: transform .15s ease, box-shadow .2s ease;
-}
-#currency-float-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(16,24,40,0.22);
-}
-@media (max-width:600px){
-  #currency-float-btn { right: 14px; bottom: 90px; padding: 9px 14px; font-size: 14px; }
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: #2f443674;
+  color: #fff;
 }
 
+#currency-link:hover {
+  opacity: 0.9;
+}
 /* Popup overlay */
 .currency-popup {
   position: fixed;
@@ -900,12 +888,12 @@ z-index: 800;
 </header>
 
 
-  <nav class="navbar">
-    <a href="#">Sarees</a>
-    <a href="#">Creams</a>
-    <a href="#">Hair Bands</a>
-    
-  </nav>
+ <nav class="navbar">
+  <a href="#">Hand Wears</a>
+  <a href="#" id="currency-link">Change Currency</a>
+  
+  <a href="#">Hair Bands</a>
+</nav>
 
   <section class="main">
     <div class="left">
@@ -954,8 +942,7 @@ z-index: 800;
   <div>
     <button class="ai-btn" id="openAISearch">Try AI Search</button>
   </div>
-  <!-- Floating Currency Button -->
-<button id="currency-float-btn" title="Change currency">Currency</button>
+ 
 
 <!-- Currency Popup -->
 <div id="currency-popup" class="currency-popup hidden" role="dialog" aria-modal="true">
@@ -1548,8 +1535,11 @@ function renderCart() {
 
   <script>
 (function(){
-  const btnFloat = document.getElementById('currency-float-btn');
-  const popup = document.getElementById('currency-popup');
+const currencyLink = document.getElementById('currency-link');
+currencyLink.addEventListener('click', (e) => {
+  e.preventDefault();      // prevent page jump
+  popup.classList.remove('hidden');  // show the popup
+});  const popup = document.getElementById('currency-popup');
   const closeBtn = document.getElementById('close-currency-popup');
   const curBtns = popup.querySelectorAll('.cur-btn');
 
@@ -1600,7 +1590,6 @@ function renderCart() {
   setUI(current);
 
   // open/close popup
-  btnFloat.addEventListener('click', ()=> popup.classList.remove('hidden'));
   closeBtn.addEventListener('click', ()=> popup.classList.add('hidden'));
   popup.addEventListener('click', (e)=>{
     if(e.target === popup) popup.classList.add('hidden');
