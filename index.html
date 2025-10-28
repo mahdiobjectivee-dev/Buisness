@@ -6,7 +6,7 @@
   <title>Rongtuli</title>
 
   <style>
-  * { box-sizing: border-box; }
+   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; padding: 0; }
   body {
     font-family: "Poppins", sans-serif;
@@ -202,7 +202,6 @@
     cursor: pointer;
     flex: 0 0 220px;
     min-width: 220px;
-
     /* start hidden for entrance animation */
     opacity: 0;
     transform: translateY(14px) scale(.995);
@@ -232,13 +231,15 @@
     color: #7092b0;
     font-weight: 800;
     font-size: 15px;
-    margin-top: 6px;
+    margin-top: px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 200px;
   }
-  .product-price { color: var(--text); font-weight: 800; font-size: 18px; margin-top: 2px; }
+  .product-price { color: var(--text); font-weight: 800; font-size: 18px; margin-top: 1px!important; }
+
+  
 
   .add-btn {
     background: linear-gradient(180deg,var(--accent),var(--accent-dark));
@@ -537,7 +538,6 @@
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(106,168,214,0.16);
 }
-/* Improved mobile layout for .ai-promo */
 @media (max-width:720px) {
   .ai-promo {
     flex-direction: column;
@@ -545,10 +545,8 @@
     text-align: center;
     padding: 14px;
     gap: 12px;
-    margin: 20px 12px;        /* keep some side inset on small screens */
+    margin: 20px 12px;
   }
-
-  /* keep icon + text row on small tablets, but tighter */
   .ai-promo .left {
     display: flex;
     gap: 10px;
@@ -556,27 +554,22 @@
     justify-content: center;
     width: 100%;
   }
-
   .ai-promo .left .icon {
     width: 48px;
     height: 48px;
     font-size: 18px;
     flex: 0 0 48px;
   }
-
   .ai-promo h3 {
     margin: 0;
     font-size: 15px;
     line-height: 1.15;
   }
-
   .ai-promo p {
     margin: 4px 0 0 0;
     font-size: 13px;
     color: var(--muted);
   }
-
-  /* CTA full width, but not flush to page edges */
   .ai-promo .ai-btn {
     display: block;
     width: calc(100% - 24px);
@@ -587,20 +580,17 @@
   }
 }
 
-/* Extra tweak for very small phones: icon above text */
 @media (max-width:420px) {
   .ai-promo .left {
     flex-direction: column;
     gap: 8px;
     align-items: center;
   }
-
   .ai-promo .left .icon {
     width: 56px;
     height: 56px;
     font-size: 20px;
   }
-
   .ai-promo { padding: 12px; gap: 10px; margin: 16px 10px; }
   .ai-promo .ai-btn { width: 100%; padding: 12px; }
 }
@@ -794,6 +784,17 @@ body::before{
 }
 
 
+/* ----------------------------
+   CURRENCY TOGGLE STYLES (ADDED)
+   ---------------------------- */
+.currency-switch{display:flex;align-items:center;gap:8px;margin-left:auto;font-weight:700}
+.switch{position:relative;display:inline-block;width:46px;height:24px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:24px;transition:0.22s}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.22s;box-shadow:0 2px 6px rgba(0,0,0,0.12)}
+.switch input:checked + .slider{background:#6aa8d6}
+.switch input:checked + .slider:before{transform:translateX(22px)}
+.switch-label{font-size:13px;color:#143047}
   </style>
 
 
@@ -802,7 +803,19 @@ body::before{
   <header class="header">
 <a href="index.html">
   <img src="assets/logo.png" alt="Rongtuli Logo" class="logo" />
-</a>  </header>
+</a>  
+
+
+</header>
+<!-- CURRENCY TOGGLE (ADDED) -->
+<div class="currency-switch" title="Toggle currency (QAR ⇄ BDT)">
+  <label class="switch-label">QAR</label>
+  <label class="switch" aria-hidden="true">
+    <input id="currency-toggle" type="checkbox" aria-label="Toggle currency">
+    <span class="slider"></span>
+  </label>
+  <label class="switch-label">BDT</label>
+</div>
 
   <nav class="navbar">
     <a href="#">Sarees</a>
@@ -895,9 +908,64 @@ document.getElementById('openAISearch').addEventListener('click', function () {
     const totalEl = document.getElementById('total');
     const cartToggle = document.getElementById('cart-toggle');
 
+    // migrate and load existing cart safely
     let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 
-    function formatPrice(n) { return 'QAR ' + (Number(n) || 0).toFixed(2); }
+    // migrate legacy cart items that used 'price' into new shape with price_qar & price_bdt
+    (function migrateCartItems() {
+      let saved = Array.isArray(cart) ? cart.slice() : [];
+      let changed = false;
+      saved = saved.map(it => {
+        if(!it) return it;
+        if(typeof it.price_qar === 'undefined' && typeof it.price_bdt === 'undefined') {
+          const legacy = Number(it.price || 0);
+          it.price_qar = legacy;
+          it.price_bdt = legacy;
+          delete it.price;
+          changed = true;
+        }
+        return it;
+      });
+      if(changed) {
+        cart = saved;
+        localStorage.setItem('cart', JSON.stringify(saved));
+      }
+    })();
+
+    // CURRENCY helpers (ADDED)
+    const CURRENCY_KEY = 'site_currency';
+    function getSelectedCurrency() {
+      return (localStorage.getItem(CURRENCY_KEY) || 'QAR').toUpperCase();
+    }
+    function setSelectedCurrency(c) {
+      localStorage.setItem(CURRENCY_KEY, (c||'QAR').toUpperCase());
+      const toggle = document.getElementById('currency-toggle');
+      if(toggle) toggle.checked = (c && c.toUpperCase() === 'BDT');
+    }
+    function formatPriceForDisplay(amount, currency) {
+      const n = Number(amount) || 0;
+      return (currency === 'BDT' ? 'BDT ' : 'QAR ') + n.toFixed(2);
+    }
+
+    // wire currency toggle UI (ADDED)
+    const currencyToggle = document.getElementById('currency-toggle');
+    setSelectedCurrency(getSelectedCurrency()); // initialize storage default if not present
+    if(currencyToggle){
+      currencyToggle.checked = (getSelectedCurrency() === 'BDT');
+      currencyToggle.addEventListener('change', () => {
+        const chosen = currencyToggle.checked ? 'BDT' : 'QAR';
+        setSelectedCurrency(chosen);
+        loadCatalog();   // re-render catalog
+        renderCart();    // re-render cart
+      });
+    }
+
+    function formatPrice(n, currency) {
+      // currency default to selected
+      const sel = currency || getSelectedCurrency();
+      return formatPriceForDisplay(n, sel);
+    }
+
     function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); updateCartCount(); }
     function updateCartCount() { const countSpan = cartToggle.querySelector('.count'); const qty = cart.reduce((s,i)=> s + (Number(i.quantity)||0), 0); countSpan.textContent = qty; cartToggle.setAttribute('aria-label', `Open cart — ${qty} items`); }
     document.getElementById('year').textContent = new Date().getFullYear();
@@ -973,7 +1041,12 @@ document.getElementById('openAISearch').addEventListener('click', function () {
 
           const price = document.createElement('div');
           price.className = 'product-price';
-          price.textContent = (p.price !== undefined && p.price !== null) ? `${p.price} QR` : '—';
+          // currency-aware display (ADDED)
+          const selectedCurrency = getSelectedCurrency();
+          const qarVal = Number(p.price_qar ?? p.price ?? 0);
+          const bdtVal = Number(p.price_bdt ?? 0);
+          const displayVal = selectedCurrency === 'BDT' ? (bdtVal || qarVal) : (qarVal || bdtVal);
+          price.textContent = formatPrice(displayVal, selectedCurrency);
 
           const addBtn = document.createElement('button');
           addBtn.className = 'add-btn';
@@ -982,7 +1055,16 @@ document.getElementById('openAISearch').addEventListener('click', function () {
             e.stopPropagation();
             const existing = cart.find(i => i.id === p.id);
             if (existing) existing.quantity++;
-            else cart.push({ id: p.id, name: p.name, price: Number(p.price)||0, image: imgSrc || '', quantity: 1, link: `${window.location.origin}/product.html?id=${p.id}` });
+            else cart.push({
+              id: p.id,
+              name: p.name,
+              // store both currencies
+              price_qar: Number(p.price_qar ?? p.price ?? 0),
+              price_bdt: Number(p.price_bdt ?? 0),
+              image: imgSrc || '',
+              quantity: 1,
+              link: `${window.location.origin}/product.html?id=${p.id}`
+            });
             saveCart();
             openCart();
           });
@@ -1063,7 +1145,12 @@ document.getElementById('openAISearch').addEventListener('click', function () {
 
           const price = document.createElement('div');
           price.className = 'product-price';
-          price.textContent = (p.price !== undefined && p.price !== null) ? `${p.price} QR` : '—';
+          // currency-aware for explore section
+          const selectedCurrency2 = getSelectedCurrency();
+          const qarVal2 = Number(p.price_qar ?? p.price ?? 0);
+          const bdtVal2 = Number(p.price_bdt ?? 0);
+          const displayVal2 = selectedCurrency2 === 'BDT' ? (bdtVal2 || qarVal2) : (qarVal2 || bdtVal2);
+          price.textContent = formatPrice(displayVal2, selectedCurrency2);
 
           const addBtn = document.createElement('button');
           addBtn.className = 'add-btn';
@@ -1072,7 +1159,15 @@ document.getElementById('openAISearch').addEventListener('click', function () {
             e.stopPropagation();
             const existing = cart.find(i => i.id === p.id);
             if (existing) existing.quantity++;
-            else cart.push({ id: p.id, name: p.name, price: Number(p.price)||0, image: imgSrc || '', quantity: 1, link: `${window.location.origin}/product.html?id=${p.id}` });
+            else cart.push({
+              id: p.id,
+              name: p.name,
+              price_qar: Number(p.price_qar ?? p.price ?? 0),
+              price_bdt: Number(p.price_bdt ?? 0),
+              image: imgSrc || '',
+              quantity: 1,
+              link: `${window.location.origin}/product.html?id=${p.id}`
+            });
             saveCart();
             openCart();
           });
@@ -1124,8 +1219,11 @@ function renderCart() {
       txt.className = 'cart-text';
       const title = document.createElement('div');
       title.textContent = it.name || 'Product';
+      // determine per-item displayed price based on selected currency, fallbacks in order
+      const selCurrency = getSelectedCurrency();
+      const perItemPrice = selCurrency === 'BDT' ? (Number(it.price_bdt || it.price_qar || 0)) : (Number(it.price_qar || it.price_bdt || 0));
       const subtitle = document.createElement('div');
-      subtitle.textContent = `${formatPrice(it.price)} × ${it.quantity}`;
+      subtitle.textContent = `${formatPrice(perItemPrice, selCurrency)} × ${it.quantity}`;
       txt.appendChild(title);
       txt.appendChild(subtitle);
 
@@ -1161,11 +1259,17 @@ function renderCart() {
     });
   }
 
-  const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0);
+  // compute totals using selected currency
+  const selCurrency = getSelectedCurrency();
+  const subtotal = cart.reduce((s, item) => {
+    const unit = selCurrency === 'BDT' ? Number(item.price_bdt || item.price_qar || 0) : Number(item.price_qar || item.price_bdt || 0);
+    return s + unit * (Number(item.quantity) || 0);
+  }, 0);
+
   const shipping = subtotal > 0 ? 10 : 0;
-  subtotalEl.textContent = 'Subtotal: ' + formatPrice(subtotal);
-  shippingEl.textContent = 'Shipping: ' + formatPrice(shipping);
-  totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping);
+  subtotalEl.textContent = 'Subtotal: ' + formatPrice(subtotal, selCurrency);
+  shippingEl.textContent = 'Shipping: ' + formatPrice(shipping, selCurrency);
+  totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping, selCurrency);
 }
 
 
@@ -1182,7 +1286,10 @@ function renderCart() {
 
           const txt = document.createElement('div');
           txt.style.flex = '1';
-          txt.innerHTML = `<div style="font-weight:800">${it.name}</div><div style="font-size:13px;color:var(--muted)">${formatPrice(it.price)} × ${it.quantity}</div>`;
+          // choose displayed price according to selected currency (keeps compatibility)
+          const selCurrency2 = getSelectedCurrency();
+          const displayedUnit = selCurrency2 === 'BDT' ? Number(it.price_bdt || it.price_qar || 0) : Number(it.price_qar || it.price_bdt || 0);
+          txt.innerHTML = `<div style="font-weight:800">${it.name}</div><div style="font-size:13px;color:var(--muted)">${formatPrice(displayedUnit, selCurrency2)} × ${it.quantity}</div>`;
 
           const controls = document.createElement('div');
           controls.style.display = 'flex';
@@ -1199,20 +1306,24 @@ function renderCart() {
           cartRows.appendChild(row);
         });
       }
-      const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0);
+      const subtotal = cart.reduce((s,i)=> s + ( (getSelectedCurrency() === 'BDT' ? Number(i.price_bdt||i.price_qar||0) : Number(i.price_qar||i.price_bdt||0)) ) * i.quantity, 0);
       const shipping = subtotal > 0 ? 10 : 0;
-      subtotalEl.textContent = 'Subtotal: ' + formatPrice(subtotal);
-      shippingEl.textContent = 'Shipping: ' + formatPrice(shipping);
-      totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping);
+      subtotalEl.textContent = 'Subtotal: ' + formatPrice(subtotal, getSelectedCurrency());
+      shippingEl.textContent = 'Shipping: ' + formatPrice(shipping, getSelectedCurrency());
+      totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping, getSelectedCurrency());
     
 
     function checkoutWhatsApp() {
       if (cart.length === 0) { alert('Cart is empty.'); return; }
-      let text = 'Order request — items:\n\n';
-      cart.forEach(it => text += `${it.name} — QAR ${it.price} × ${it.quantity}\n`);
-      const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0);
+      const selCurrency = getSelectedCurrency();
+      let text = `Order request — items (${selCurrency}):\n\n`;
+      cart.forEach(it => {
+        const unit = selCurrency === 'BDT' ? Number(it.price_bdt || it.price_qar || 0) : Number(it.price_qar || it.price_bdt || 0);
+        text += `${it.name} — ${selCurrency} ${unit.toFixed(2)} × ${it.quantity}\n`;
+      });
+      const subtotal = cart.reduce((s,i)=> s + ( (selCurrency === 'BDT' ? Number(i.price_bdt||i.price_qar||0) : Number(i.price_qar||i.price_bdt||0)) ) * i.quantity, 0);
       const shipping = subtotal > 0 ? 10 : 0;
-      text += `\nSubtotal: QAR ${subtotal.toFixed(2)}\nShipping: QAR ${shipping.toFixed(2)}\nTotal: QAR ${(subtotal+shipping).toFixed(2)}`;
+      text += `\nSubtotal: ${selCurrency} ${subtotal.toFixed(2)}\nShipping: ${selCurrency} ${shipping.toFixed(2)}\nTotal: ${selCurrency} ${(subtotal+shipping).toFixed(2)}`;
       const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
       window.open(url, '_blank');
     }
