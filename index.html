@@ -784,17 +784,108 @@ body::before{
 }
 
 
-/* ----------------------------
-   CURRENCY TOGGLE STYLES (ADDED)
-   ---------------------------- */
-.currency-switch{display:flex;align-items:center;gap:8px;margin-left:auto;font-weight:700}
-.switch{position:relative;display:inline-block;width:46px;height:24px}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:24px;transition:0.22s}
-.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:0.22s;box-shadow:0 2px 6px rgba(0,0,0,0.12)}
-.switch input:checked + .slider{background:#6aa8d6}
-.switch input:checked + .slider:before{transform:translateX(22px)}
-.switch-label{font-size:13px;color:#143047}
+
+
+/* Floating currency button */
+#currency-float-btn {
+  position: fixed;
+  right: 21px;
+  bottom: 550px; /* just below cart */
+  background: linear-gradient(180deg,var(--accent),var(--accent-dark));
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.18);
+  cursor: pointer;
+z-index: 800;
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+#currency-float-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(16,24,40,0.22);
+}
+@media (max-width:600px){
+  #currency-float-btn { right: 14px; bottom: 90px; padding: 9px 14px; font-size: 14px; }
+}
+
+/* Popup overlay */
+.currency-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1400;
+  transition: opacity .25s ease, visibility .25s ease;
+}
+.currency-popup.hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* Popup box */
+.popup-box {
+  background: var(--card,#fff);
+  padding: 28px 30px;
+  border-radius: 14px;
+  box-shadow: 0 14px 32px rgba(16,24,40,0.18);
+  text-align: center;
+  width: 320px;
+  max-width: 90%;
+}
+.popup-box h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  color: var(--accent-dark,#333);
+}
+
+
+
+
+
+/* Currency buttons */
+.currency-options {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+.cur-btn {
+  padding: 10px 22px;
+  border-radius: 8px;
+  border: 1px solid rgba(16,24,40,0.1);
+  background: #f9fafb;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+.cur-btn.active {
+  background: linear-gradient(180deg,var(--accent),var(--accent-dark));
+  color: #fff;
+  border: none;
+  box-shadow: 0 6px 18px rgba(106,168,214,0.25);
+}
+.cur-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* Close button */
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-dark);
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  text-decoration: underline;
+}
+
+
   </style>
 
 
@@ -807,15 +898,7 @@ body::before{
 
 
 </header>
-<!-- CURRENCY TOGGLE (ADDED) -->
-<div class="currency-switch" title="Toggle currency (QAR ⇄ BDT)">
-  <label class="switch-label">QAR</label>
-  <label class="switch" aria-hidden="true">
-    <input id="currency-toggle" type="checkbox" aria-label="Toggle currency">
-    <span class="slider"></span>
-  </label>
-  <label class="switch-label">BDT</label>
-</div>
+
 
   <nav class="navbar">
     <a href="#">Sarees</a>
@@ -871,6 +954,22 @@ body::before{
   <div>
     <button class="ai-btn" id="openAISearch">Try AI Search</button>
   </div>
+  <!-- Floating Currency Button -->
+<button id="currency-float-btn" title="Change currency">Currency</button>
+
+<!-- Currency Popup -->
+<div id="currency-popup" class="currency-popup hidden" role="dialog" aria-modal="true">
+  <div class="popup-box">
+    <h3>Change Currency</h3>
+    <p style="color:var(--muted);font-size:13px;margin-top:4px">Select your preferred currency:</p>
+    <div class="currency-options">
+      <button data-cur="QAR" class="cur-btn">QAR</button>
+      <button data-cur="BDT" class="cur-btn">BDT</button>
+    </div>
+    <button id="close-currency-popup" class="close-btn">Close</button>
+  </div>
+</div>
+
   
 </div>
 
@@ -1092,6 +1191,8 @@ document.getElementById('openAISearch').addEventListener('click', function () {
         catEl.appendChild(row);
         catalogEl.appendChild(catEl);
       });
+
+      
 
       // --- Add fixed "Explore More" section (always at the end) ---
       const exploreProducts = grouped['Explore More'] || [];
@@ -1440,6 +1541,84 @@ function renderCart() {
       document.querySelectorAll('.card, .product-card').forEach(el => { el.classList.add('in'); });
     }
 
+    
   </script>
+
+
+
+  <script>
+(function(){
+  const btnFloat = document.getElementById('currency-float-btn');
+  const popup = document.getElementById('currency-popup');
+  const closeBtn = document.getElementById('close-currency-popup');
+  const curBtns = popup.querySelectorAll('.cur-btn');
+
+  // helpers
+  const getCur = ()=> (localStorage.getItem('site_currency') || 'QAR').toUpperCase();
+  const setCur = (c)=> localStorage.setItem('site_currency', c.toUpperCase());
+
+  function setUI(cur){
+    curBtns.forEach(b=>{
+      const active = b.dataset.cur === cur;
+      b.classList.toggle('active', active);
+    });
+  }
+
+  async function applyCurrency(cur){
+    setCur(cur);
+    setUI(cur);
+
+    // Try to re-render the content immediately
+    try { if (typeof setSelectedCurrency === 'function') setSelectedCurrency(cur); } catch {}
+    try { if (typeof renderCart === 'function') renderCart(); } catch {}
+    try { if (typeof updateCartCount === 'function') updateCartCount(); } catch {}
+    try { if (typeof loadCategory === 'function') await loadCategory(); } catch {}
+    try { if (typeof loadProducts === 'function') await loadProducts(); } catch {}
+
+    // Also manually refresh any price texts (if no such functions exist)
+    document.querySelectorAll('[data-price]').forEach(el=>{
+      const base = parseFloat(el.dataset.price);
+      const qarRate = 0.10; // Example conversion (1 BDT = 0.10 QAR)
+      const bdtRate = 10.00; // Example conversion (1 QAR = 10 BDT)
+      const newPrice = cur === 'QAR' ? base * qarRate : base * bdtRate;
+      el.textContent = `${cur} ${newPrice.toFixed(2)}`;
+    });
+
+    // Close popup after applying
+    popup.classList.add('hidden');
+
+    popup.classList.add('hidden');
+
+  // Short delay for a smoother user experience
+  setTimeout(() => {
+    location.reload(); // 🔄 auto reload page
+  }, 300);
+  }
+
+  // initialize
+  const current = getCur();
+  setUI(current);
+
+  // open/close popup
+  btnFloat.addEventListener('click', ()=> popup.classList.remove('hidden'));
+  closeBtn.addEventListener('click', ()=> popup.classList.add('hidden'));
+  popup.addEventListener('click', (e)=>{
+    if(e.target === popup) popup.classList.add('hidden');
+  });
+
+  // currency selection
+  curBtns.forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const c = b.dataset.cur;
+      applyCurrency(c);
+    });
+  }
+
+);
+})();
+
+
+</script>
+
 </body>
 </html>
