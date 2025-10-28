@@ -1428,8 +1428,16 @@ html, body { overflow-x: hidden; }
     get: getSelectedCurrency,
     set: (v) => { setSelectedCurrency(v); renderCart(); if($('product-area')) loadProduct(); }
   };
+
+    window.addEventListener('pageshow', function(event) {
+  // If page is loaded from back/forward cache, reload it
+  if (event.persisted) {
+    location.reload();
+  }
+});
 </script>
 
 </body>
 </html>
+
 
