@@ -874,6 +874,23 @@ body::before{
 }
 
 
+    @media (max-width: 600px) {
+  /* Hide all cards except the first one */
+  .left .card:not(:first-child) {
+    display: none;
+  }
+
+  /* Make the left container block so no extra space */
+  .left {
+    display: block;
+  }
+
+  /* First card takes full width */
+  .left .card:first-child {
+    width: 100%;
+  }
+}
+
   </style>
 
 
@@ -1614,5 +1631,6 @@ currencyLink.addEventListener('click', (e) => {
 
 </body>
 </html>
+
 
 
