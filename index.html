@@ -1607,7 +1607,16 @@ currencyLink.addEventListener('click', (e) => {
 })();
 
 
+
+    window.addEventListener('pageshow', function(event) {
+  // If page is loaded from back/forward cache, reload it
+  if (event.persisted) {
+    location.reload();
+  }
+});
+
 </script>
 
 </body>
 </html>
+
