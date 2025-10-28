@@ -851,8 +851,14 @@
     get: getSelectedCurrency,
     set: (v) => { setSelectedCurrency(v); renderCart(); loadCategory(); }
   };
+
+    if (!sessionStorage.getItem('reloaded')) {
+    sessionStorage.setItem('reloaded', 'true'); // mark as reloaded
+    location.reload(); // reload the page
+  }
 </script>
 
 </body>
 </html>
+
 
