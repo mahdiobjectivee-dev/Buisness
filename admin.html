@@ -136,9 +136,15 @@
 
           <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
             <div style="flex:1;min-width:160px">
-              <label>Price (QAR-BDT)</label>
-              <input id="p-price" placeholder="45.00" type="text" step="0.01" />
+              <label>Price (QAR)</label>
+              <input id="p-price-qar" placeholder="45.00" type="number" step="0.01" />
             </div>
+
+            <div style="flex:1;min-width:160px">
+              <label>Price (BDT)</label>
+              <input id="p-price-bdt" placeholder="1500.00" type="number" step="0.01" />
+            </div>
+
             <div style="min-width:140px">
               <label>Stock</label>
               <input id="p-stock" placeholder="Integer" type="number" />
@@ -239,10 +245,18 @@
           <label>SKU</label>
           <input id="edit-sku" />
 
-          <label>Price (QAR)</label>
-          <input id="edit-price" type="text" step="0.01" />
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px">
+            <div style="flex:1;min-width:160px">
+              <label>Price (QAR)</label>
+              <input id="edit-price-qar" type="number" step="0.01" />
+            </div>
+            <div style="flex:1;min-width:160px">
+              <label>Price (BDT)</label>
+              <input id="edit-price-bdt" type="number" step="0.01" />
+            </div>
+          </div>
 
-          <label>Stock</label>
+          <label style="margin-top:10px">Stock</label>
           <input id="edit-stock" type="number" />
 
           <label>Description</label>
@@ -315,7 +329,8 @@
     const editName = document.getElementById('edit-name');
     const editCategorySelect = document.getElementById('edit-category-select');
     const editSku = document.getElementById('edit-sku');
-    const editPrice = document.getElementById('edit-price');
+    const editPriceQar = document.getElementById('edit-price-qar');
+    const editPriceBdt = document.getElementById('edit-price-bdt');
     const editStock = document.getElementById('edit-stock');
     const editDesc = document.getElementById('edit-desc');
     const editThumbs = document.getElementById('edit-thumbs');
@@ -639,7 +654,9 @@
       const name = document.createElement('div'); name.className='name'; name.textContent = p.name || 'Product';
       card.appendChild(name);
       const displayCat = (p.category || '').trim() || 'Uncategorized';
-      const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${displayCat} • QAR ${Number(p.price||0).toFixed(2)}`;
+      const qar = Number(p.price_qar || 0).toFixed(2);
+      const bdt = Number(p.price_bdt || 0).toFixed(2);
+      const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${displayCat} • QAR ${qar} • BDT ${bdt}`;
       card.appendChild(meta);
       const desc = document.createElement('div'); desc.className='muted'; desc.style.fontSize='13px'; desc.textContent = (p.description||'').slice(0,80);
       card.appendChild(desc);
@@ -666,7 +683,9 @@
       editMsg.textContent = '';
       editName.value = product.name || '';
       editSku.value = product.sku || '';
-      editPrice.value = Number(product.price || 0);
+      // fill both prices (use 0 if missing)
+      editPriceQar.value = (typeof product.price_qar !== 'undefined' && product.price_qar !== null) ? Number(product.price_qar) : 0;
+      editPriceBdt.value = (typeof product.price_bdt !== 'undefined' && product.price_bdt !== null) ? Number(product.price_bdt) : 0;
       editStock.value = Number(product.stock || 0);
       editDesc.value = product.description || '';
       editThumbs.innerHTML = '';
@@ -686,7 +705,8 @@
       let category = (editCategorySelect.value||'').trim();
       if(category === '__create_new__') category = '';
       const sku = (editSku.value||'').trim();
-      const price = parseFloat(editPrice.value) || 0;
+      const price_qar = parseFloat(editPriceQar.value) || 0;
+      const price_bdt = parseFloat(editPriceBdt.value) || 0;
       const stock = parseInt(editStock.value) || 0;
       const desc = (editDesc.value||'').trim();
 
@@ -708,8 +728,9 @@
       }
 
       editMsg.textContent = 'Saving...';
-      const { error } = await supabase.from('products').update({ name, category, sku, price, stock, description: desc, image_urls: finalUrls }).eq('id', id);
-      if(error){ editMsg.textContent = 'Save failed'; return; }
+      const updateObj = { name, category, sku, price_qar, price_bdt, stock, description: desc, image_urls: finalUrls };
+      const { error } = await supabase.from('products').update(updateObj).eq('id', id);
+      if(error){ editMsg.textContent = 'Save failed: ' + (error.message || error); return; }
       editMsg.textContent = 'Saved';
       modalBackdrop.style.display = 'none';
       currentEdit = null;
@@ -724,7 +745,8 @@
       let category = (categorySelect.value||'').trim(); if(category === '__create_new__') category='';
       const manual = (categoryManual.value||'').trim(); if(manual) category = manual;
       const sku = (document.getElementById('p-sku').value||'').trim();
-      const price = parseFloat(document.getElementById('p-price').value) || 0;
+      const price_qar = parseFloat(document.getElementById('p-price-qar').value) || 0;
+      const price_bdt = parseFloat(document.getElementById('p-price-bdt').value) || 0;
       const stock = parseInt(document.getElementById('p-stock').value) || 0;
       const desc = (document.getElementById('p-desc').value||'').trim();
       if(!name){ createMsg.textContent='Name required'; createMsg.style.color='var(--danger)'; return; }
@@ -745,14 +767,15 @@
       }
 
       createMsg.textContent = 'Saving...';
-      const { data, error } = await supabase.from('products').insert([{ name, category, sku, price, stock, description: desc, image_urls: urls }]);
+      const insertObj = { name, category, sku, price_qar, price_bdt, stock, description: desc, image_urls: urls };
+      const { data, error } = await supabase.from('products').insert([insertObj]);
       if(error){ createMsg.textContent='DB error: '+error.message; createMsg.style.color='var(--danger)'; return; }
       createMsg.textContent='Created'; createMsg.style.color='var(--accent)';
-      ['p-name','p-category-manual','p-sku','p-price','p-stock','p-desc','img1','img2','img3'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+      ['p-name','p-category-manual','p-sku','p-price-qar','p-price-bdt','p-stock','p-desc','img1','img2','img3'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
       await reloadAll();
     });
 
-    btnClear.addEventListener('click', ()=>{ ['p-name','p-category-manual','p-sku','p-price','p-stock','p-desc','img1','img2','img3'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); createMsg.textContent=''; });
+    btnClear.addEventListener('click', ()=>{ ['p-name','p-category-manual','p-sku','p-price-qar','p-price-bdt','p-stock','p-desc','img1','img2','img3'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); createMsg.textContent=''; });
 
     // create local category
     btnAddCategory.addEventListener('click', async ()=>{
@@ -825,4 +848,3 @@
   </script>
 </body>
 </html>
-
