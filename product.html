@@ -785,230 +785,291 @@ html, body { overflow-x: hidden; }
   </div>
 
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+  const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const WHATSAPP_NUMBER = '97451707046';
-    document.getElementById('year').textContent = new Date().getFullYear();
+  const WHATSAPP_NUMBER = '97451707046';
 
-    // cart stored in localStorage
-    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+  // helper selectors
+  const $ = id => document.getElementById(id);
+  function safeOn(id, ev, fn){ const el = $(id); if(el) el.addEventListener(ev, fn); }
 
-    function saveCart(){
-      localStorage.setItem('cart', JSON.stringify(cart));
-      localStorage.setItem('cart_last_update', Date.now());
-      renderCart();
-      updateCartCount();
-    }
+  // set year if present
+  if($('year')) $('year').textContent = new Date().getFullYear();
 
-    document.getElementById('openAISearch').addEventListener('click', function () {
-      window.location.href = 'search.html';
-    });
-    // elements
-    const cartToggle = document.getElementById('cart-toggle');
-    const cartEl = document.getElementById('cart');
-    const cartRows = document.getElementById('cart-rows');
-    const subtotalEl = document.getElementById('subtotal');
-    const shippingEl = document.getElementById('shipping');
-    const totalEl = document.getElementById('total');
-    const checkoutBtn = document.getElementById('checkout-btn');
-    const cartCloseFooter = document.getElementById('cart-close-footer');
+  // currency helpers
+  const CURRENCY_KEY = 'site_currency';
+  function getSelectedCurrency(){ return (localStorage.getItem(CURRENCY_KEY) || 'QAR').toUpperCase(); }
+  function setSelectedCurrency(v){ localStorage.setItem(CURRENCY_KEY, (v||'QAR').toUpperCase()); }
+  function formatPriceWithLabel(amount){
+    const cur = getSelectedCurrency();
+    const n = Number(amount) || 0;
+    return (cur === 'BDT' ? 'BDT ' : 'QAR ') + n.toFixed(2);
+  }
+  // keep old name for compatibility
+  function formatPrice(n){ return formatPriceWithLabel(n); }
 
-    function formatPrice(n){ return 'QAR ' + (Number(n)||0).toFixed(2); }
+  // escape helper
+  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','/':'&#x2F;'}[c])); }
 
-    function updateCartCount(){
-      const qty = cart.reduce((s,i)=> s + (Number(i.quantity)||0), 0);
-      cartToggle.querySelector('.count').textContent = qty;
-      cartToggle.setAttribute('aria-label', `Open cart — ${qty} items`);
-    }
+  // cart
+  let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 
-    function renderCart(){
-      cartRows.innerHTML = '';
-      if(!cart || cart.length === 0){
-        cartRows.textContent = 'Cart is empty.';
+  // migrate legacy
+  (function migrateCart(){
+    if(!Array.isArray(cart)) cart = [];
+    let changed = false;
+    cart = cart.map(it => {
+      if(!it) return it;
+      if(typeof it.price_qar === 'undefined' && typeof it.price_bdt === 'undefined'){
+        const legacy = Number(it.price || 0);
+        it.price_qar = legacy;
+        it.price_bdt = legacy;
+        delete it.price;
+        changed = true;
       } else {
-        cart.forEach((it, i) => {
-          const row = document.createElement('div');
-          row.className = 'cart-row';
-
-          const img = document.createElement('img');
-          img.className = 'cart-img';
-          img.src = it.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23eee"/></svg>';
-          img.alt = it.name || 'product';
-
-          const txt = document.createElement('div');
-          txt.className = 'cart-text';
-          const title = document.createElement('div');
-          title.textContent = it.name || 'Product';
-          const meta = document.createElement('div');
-          meta.textContent = `${formatPrice(it.price)} × ${it.quantity}`;
-          txt.appendChild(title);
-          txt.appendChild(meta);
-
-          const controls = document.createElement('div');
-          controls.className = 'cart-controls';
-
-          const inc = document.createElement('button');
-          inc.className = 'small-btn icon';
-          inc.textContent = '+';
-          inc.addEventListener('click', (e) => { e.stopPropagation(); cart[i].quantity++; saveCart(); });
-
-          const dec = document.createElement('button');
-          dec.className = 'small-btn icon';
-          dec.textContent = '-';
-          dec.addEventListener('click', (e) => { e.stopPropagation(); if (cart[i].quantity > 1) cart[i].quantity--; else cart.splice(i,1); saveCart(); });
-
-          const rem = document.createElement('button');
-          rem.className = 'small-btn';
-          rem.textContent = 'Remove';
-          rem.addEventListener('click', (e) => { e.stopPropagation(); cart.splice(i,1); saveCart(); });
-
-          controls.appendChild(inc);
-          controls.appendChild(dec);
-          controls.appendChild(rem);
-
-          row.appendChild(img);
-          row.appendChild(txt);
-          row.appendChild(controls);
-
-          cartRows.appendChild(row);
-        });
+        it.price_qar = Number(it.price_qar || it.price || 0);
+        it.price_bdt = Number(it.price_bdt || it.price || it.price_qar || 0);
       }
-
-      const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0);
-      const shipping = subtotal > 0 ? 10 : 0;
-      subtotalEl.textContent = 'Subtotal: ' + formatPrice(subtotal);
-      shippingEl.textContent = 'Shipping: ' + formatPrice(shipping);
-      totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping);
-    }
-
-    // animate cart open/close (non-destructive, replaces direct show/hide)
-    function animateCartOpen(){
-      cartEl.classList.remove('hidden','anim-out');
-      // force reflow so anim-in runs
-      void cartEl.offsetWidth;
-      cartEl.classList.add('anim-in');
-      cartEl.style.display = 'block';
-      cartEl.setAttribute('aria-hidden','false');
-      cartToggle.setAttribute('aria-expanded','true');
-      cartEl.scrollTop = 0;
-    }
-    function animateCartClose(){
-      cartEl.classList.remove('anim-in');
-      cartEl.classList.add('anim-out');
-      cartEl.setAttribute('aria-hidden','true');
-      cartToggle.setAttribute('aria-expanded','false');
-      setTimeout(()=> {
-        if (cartEl.classList.contains('anim-out')) {
-          cartEl.classList.add('hidden');
-          cartEl.classList.remove('anim-out');
-          cartEl.style.display = 'none';
-        }
-      }, 260);
-    }
-    // keep original named functions behavior for compatibility
-    function openCart(){ animateCartOpen(); }
-    function closeCart(){ animateCartClose(); }
-    function toggleCart(){ if(cartEl.classList.contains('hidden')) animateCartOpen(); else animateCartClose(); }
-
-    cartToggle.addEventListener('click', toggleCart);
-    cartCloseFooter.addEventListener('click', closeCart);
-    checkoutBtn.addEventListener('click', checkoutWhatsApp);
-
-    window.addEventListener('storage', (e) => {
-      if(e.key === 'cart' || e.key === 'cart_last_update'){
-        try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
-        renderCart();
-        updateCartCount();
-        // bump visual feedback for cart change
-        triggerCartBump();
-      }
+      return it;
     });
+    if(changed) localStorage.setItem('cart', JSON.stringify(cart));
+  })();
 
-    // WhatsApp checkout
-        function checkoutWhatsApp() { if (cart.length === 0) { alert('Cart is empty.'); return; } let text = 'Order request — items:\n\n'; cart.forEach(it => text += `${it.name} — QAR ${it.price} × ${it.quantity}\n`); const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0); const shipping = subtotal > 0 ? 10 : 0; text += `\nSubtotal: QAR ${subtotal.toFixed(2)}\nShipping: QAR ${shipping.toFixed(2)}\nTotal: QAR ${(subtotal+shipping).toFixed(2)}`; const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`; window.open(url, '_blank'); }
+  function saveCart(){
+    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem('cart_last_update', Date.now());
+    renderCart();
+    updateCartCount();
+  }
 
+  // DOM elements (guarded)
+  const cartToggle = $('cart-toggle');
+  const cartEl = $('cart');
+  const cartRows = $('cart-rows');
+  const subtotalEl = $('subtotal');
+  const shippingEl = $('shipping');
+  const totalEl = $('total');
+  const checkoutBtn = $('checkout-btn');
+  const cartCloseFooter = $('cart-close-footer');
 
-    // Product loader (same as before), thumbnails limited to 3 + overlay + popup viewer
-    async function loadProduct(){
-      const urlParams = new URLSearchParams(window.location.search);
-      const id = urlParams.get('id');
-      if(!id){ document.getElementById('product-area').innerHTML = '<div>Product ID missing</div>'; return; }
-      const { data, error } = await supabase.from('products').select('*').eq('id', id).single();
-      if(error || !data){ document.getElementById('product-area').innerHTML = '<div>Product not found</div>'; return; }
-      const p = data;
-      window.__currentProduct = p; // store for "more products" queries
-      const images = (p.image_urls && p.image_urls.length) ? p.image_urls : [''];
-      const mainImg = images[0] || '';
+  function updateCartCount(){
+    if(!cartToggle) return;
+    const qty = cart.reduce((s,i)=> s + (Number(i.quantity)||0), 0);
+    const span = cartToggle.querySelector('.count');
+    if(span) span.textContent = qty;
+    cartToggle.setAttribute('aria-label', `Open cart — ${qty} items`);
+  }
 
-      // render but only show up to 3 thumbnails; add overlay if more
-      const html = `
-        <div class="top">
-          <div class="gallery">
-            <div style="height:320px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#f8fbff">
-              <img id="main-img" class="main-img product-image" src="${escapeHtml(mainImg)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"/>
-            </div>
-            <div class="thumbs" id="thumbs">
-              ${images.slice(0,3).map((u,i)=>`<img src="${escapeHtml(u)}" class="${i===0 ? 'active':''}" data-i="${i}" />`).join('')}
-              ${images.length > 3 ? `<div class="thumb-overlay" id="thumb-overlay">+${images.length - 3}</div>` : ''}
-            </div>
+  function renderCart(){
+    if(!cartRows) return;
+    cartRows.innerHTML = '';
+    if(!cart || cart.length === 0){
+      cartRows.textContent = 'Cart is empty.';
+    } else {
+      cart.forEach((it, i) => {
+        const row = document.createElement('div');
+        row.className = 'cart-row';
+
+        const img = document.createElement('img');
+        img.className = 'cart-img';
+        img.src = it.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23eee"/></svg>';
+        img.alt = it.name || 'product';
+
+        const txt = document.createElement('div');
+        txt.className = 'cart-text';
+        const title = document.createElement('div');
+        title.textContent = it.name || 'Product';
+
+        const sel = getSelectedCurrency();
+        const perUnit = sel === 'BDT' ? Number(it.price_bdt || it.price_qar || 0) : Number(it.price_qar || it.price_bdt || 0);
+        const meta = document.createElement('div');
+        meta.textContent = `${formatPriceWithLabel(perUnit)} × ${it.quantity}`;
+
+        txt.appendChild(title);
+        txt.appendChild(meta);
+
+        const controls = document.createElement('div');
+        controls.className = 'cart-controls';
+
+        const inc = document.createElement('button'); inc.className = 'small-btn icon'; inc.textContent = '+';
+        inc.addEventListener('click', (e)=>{ e.stopPropagation(); cart[i].quantity++; saveCart(); });
+
+        const dec = document.createElement('button'); dec.className = 'small-btn icon'; dec.textContent = '-';
+        dec.addEventListener('click', (e)=>{ e.stopPropagation(); if(cart[i].quantity>1) cart[i].quantity--; else cart.splice(i,1); saveCart(); });
+
+        const rem = document.createElement('button'); rem.className = 'small-btn'; rem.textContent = 'Remove';
+        rem.addEventListener('click', (e)=>{ e.stopPropagation(); cart.splice(i,1); saveCart(); });
+
+        controls.appendChild(inc); controls.appendChild(dec); controls.appendChild(rem);
+
+        row.appendChild(img); row.appendChild(txt); row.appendChild(controls);
+        cartRows.appendChild(row);
+      });
+    }
+
+    // totals
+    const sel = getSelectedCurrency();
+    const subtotal = cart.reduce((s,item) => {
+      const unit = sel === 'BDT' ? Number(item.price_bdt || item.price_qar || 0) : Number(item.price_qar || item.price_bdt || 0);
+      return s + unit * (Number(item.quantity)||0);
+    }, 0);
+    const shipping = subtotal > 0 ? 10 : 0;
+    if(subtotalEl) subtotalEl.textContent = 'Subtotal: ' + formatPriceWithLabel(subtotal);
+    if(shippingEl) shippingEl.textContent = 'Shipping: ' + formatPriceWithLabel(shipping);
+    if(totalEl) totalEl.textContent = 'Total: ' + formatPriceWithLabel(subtotal + shipping);
+  }
+
+  // cart open/close same UI behavior
+  function animateCartOpen(){
+    if(!cartEl) return;
+    cartEl.classList.remove('hidden','anim-out');
+    void cartEl.offsetWidth;
+    cartEl.classList.add('anim-in');
+    cartEl.style.display = 'block';
+    cartEl.setAttribute('aria-hidden','false');
+    if(cartToggle) cartToggle.setAttribute('aria-expanded','true');
+    cartEl.scrollTop = 0;
+  }
+  function animateCartClose(){
+    if(!cartEl) return;
+    cartEl.classList.remove('anim-in');
+    cartEl.classList.add('anim-out');
+    cartEl.setAttribute('aria-hidden','true');
+    if(cartToggle) cartToggle.setAttribute('aria-expanded','false');
+    setTimeout(()=> {
+      if(cartEl.classList.contains('anim-out')){ cartEl.classList.add('hidden'); cartEl.classList.remove('anim-out'); cartEl.style.display = 'none'; }
+    }, 260);
+  }
+  function openCart(){ animateCartOpen(); }
+  function closeCart(){ animateCartClose(); }
+  function toggleCart(){ if(!cartEl) return; if(cartEl.classList.contains('hidden')) animateCartOpen(); else animateCartClose(); }
+
+  if(cartToggle) cartToggle.addEventListener('click', toggleCart);
+  if(cartCloseFooter) cartCloseFooter.addEventListener('click', closeCart);
+  if(checkoutBtn) checkoutBtn.addEventListener('click', checkoutWhatsApp);
+
+  window.addEventListener('storage', (e) => {
+    if(e.key === 'cart' || e.key === 'cart_last_update'){
+      try{ cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
+      renderCart(); updateCartCount(); triggerCartBump();
+    }
+    if(e.key === CURRENCY_KEY){
+      renderCart();
+      if(typeof loadProduct === 'function' && $('product-area')) loadProduct();
+    }
+  });
+
+  // WhatsApp checkout (currency-aware)
+  function checkoutWhatsApp(){
+    if(!cart || cart.length === 0){ alert('Cart is empty.'); return; }
+    const sel = getSelectedCurrency();
+    let text = `Order request — items (${sel}):\n\n`;
+    cart.forEach(it => {
+      const unit = sel === 'BDT' ? Number(it.price_bdt || it.price_qar || 0) : Number(it.price_qar || it.price_bdt || 0);
+      text += `${it.name} — ${sel} ${unit.toFixed(2)} × ${it.quantity}\n`;
+    });
+    const subtotal = cart.reduce((s,i) => { const unit = sel === 'BDT' ? Number(i.price_bdt || i.price_qar || 0) : Number(i.price_qar || i.price_bdt || 0); return s + unit * i.quantity; }, 0);
+    const shipping = subtotal > 0 ? 10 : 0;
+    text += `\nSubtotal: ${sel} ${subtotal.toFixed(2)}\nShipping: ${sel} ${shipping.toFixed(2)}\nTotal: ${sel} ${(subtotal+shipping).toFixed(2)}`;
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  }
+
+  // safe AI search button binding (ai-promo exists in your markup)
+  if($('openAISearch')) $('openAISearch').addEventListener('click', ()=> window.location.href = 'search.html');
+
+  // -----------------------------
+  // loadProduct — includes the exact thumbnails + overlay HTML + behavior you requested
+  // -----------------------------
+  async function loadProduct(){
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
+    const productArea = $('product-area');
+    if(!productArea){ return; }
+    if(!id){ productArea.innerHTML = '<div>Product ID missing</div>'; return; }
+
+    const { data, error } = await supabase.from('products').select('*').eq('id', id).single();
+    if(error || !data){ productArea.innerHTML = '<div>Product not found</div>'; return; }
+    const p = data;
+    window.__currentProduct = p;
+    const images = (p.image_urls && p.image_urls.length) ? p.image_urls : [''];
+    const mainImg = images[0] || '';
+
+    // choose price according to currency (fallbacks)
+    const sel = getSelectedCurrency();
+    const qarVal = Number(p.price_qar ?? p.price ?? 0);
+    const bdtVal = Number(p.price_bdt ?? p.price ?? 0);
+    const activePrice = sel === 'BDT' ? (bdtVal || qarVal) : (qarVal || bdtVal);
+
+    // render but only show up to 3 thumbnails; add overlay if more
+    const html = `
+      <div class="top">
+        <div class="gallery">
+          <div style="height:320px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#f8fbff">
+            <img id="main-img" class="main-img product-image" src="${escapeHtml(mainImg)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"/>
           </div>
-          <div class="info">
-            <h2 style="margin:0">${escapeHtml(p.name)}</h2>
-            <div style="font-size:13px;color:var(--muted);margin-top:6px">Category: ${escapeHtml(p.category||'Uncategorized')}</div>
-            <div class="price">${formatPrice(p.price)}</div>
-            <div style="margin-top:10px;color:var(--muted)">${escapeHtml(p.description||'No description')}</div>
-
-            <div class="add-row">
-              <div class="qty">
-                <button id="dec">−</button>
-                <input id="qty" value="1" style="width:48px;text-align:center;border:0;background:transparent;font-weight:700"/>
-                <button id="inc">＋</button>
-              </div>
-              <button id="add-cart" class="btn-add">Add to Cart</button>
-            </div>
+          <div class="thumbs" id="thumbs">
+            ${images.slice(0,3).map((u,i)=>`<img src="${escapeHtml(u)}" class="${i===0 ? 'active':''}" data-i="${i}" />`).join('')}
+            ${images.length > 3 ? `<div class="thumb-overlay" id="thumb-overlay">+${images.length - 3}</div>` : ''}
           </div>
         </div>
-      `;
-      document.getElementById('product-area').innerHTML = html;
+        <div class="info">
+          <h2 style="margin:0">${escapeHtml(p.name)}</h2>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">Category: ${escapeHtml(p.category||'Uncategorized')}</div>
+          <div class="price">${formatPriceWithLabel(activePrice)}</div>
+          <div style="margin-top:10px;color:var(--muted)">${escapeHtml(p.description||'No description')}</div>
 
-      // thumbnails - behavior: click updates main image (preserving shimmer), animate reveal by adding .in (do NOT set inline opacity)
-      const thumbs = document.querySelectorAll('#thumbs img');
-      thumbs.forEach((img, idx) => {
-        // add small staggered reveal (do not set inline opacity - keep CSS-controlled)
-        setTimeout(()=> img.classList.add('in'), 160 + idx * 80);
+          <div class="add-row">
+            <div class="qty">
+              <button id="dec">−</button>
+              <input id="qty" value="1" style="width:48px;text-align:center;border:0;background:transparent;font-weight:700"/>
+              <button id="inc">＋</button>
+            </div>
+            <button id="add-cart" class="btn-add">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+    `;
+    productArea.innerHTML = html;
 
-        img.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          document.querySelectorAll('#thumbs img').forEach(x => x.classList.remove('active'));
-          img.classList.add('active');
-          const main = document.getElementById('main-img');
-          main.classList.remove('in');
-          // small delay to allow exit transition
-          setTimeout(()=> {
-            main.src = img.src;
-            main.dataset.index = idx; // track index among visible thumbs
-            // mark loading shimmer while new image loads
-            main.setAttribute('data-loading','true');
-          }, 80);
-        });
+    // thumbnails - behavior: click updates main image (preserving shimmer), animate reveal by adding .in (do NOT set inline opacity)
+    const thumbs = document.querySelectorAll('#thumbs img');
+    thumbs.forEach((img, idx) => {
+      // add small staggered reveal (do not set inline opacity - keep CSS-controlled)
+      setTimeout(()=> img.classList.add('in'), 160 + idx * 80);
 
-        // (no dblclick) thumbnails only update main image on click
+      img.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        document.querySelectorAll('#thumbs img').forEach(x => x.classList.remove('active'));
+        img.classList.add('active');
+        const main = $('main-img');
+        if(!main) return;
+        main.classList.remove('in');
+        // small delay to allow exit transition
+        setTimeout(()=> {
+          main.src = img.src;
+          main.dataset.index = idx; // track index among visible thumbs
+          // mark loading shimmer while new image loads
+          main.setAttribute('data-loading','true');
+        }, 80);
       });
+    });
 
-      // overlay opens popup with full images list
-      const overlay = document.getElementById('thumb-overlay');
-      if(overlay){
-        overlay.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          openFs(0); // open viewer starting at first image
-        });
-      }
+    // overlay opens popup with full images list
+    const overlay = $('thumb-overlay');
+    if(overlay){
+      overlay.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openFs(0); // open viewer starting at first image
+      });
+    }
 
-      // main image: handle load -> show
-      const mainImgEl = document.getElementById('main-img');
+    // main image: handle load -> show
+    const mainImgEl = $('main-img');
+    if(mainImgEl){
       mainImgEl.setAttribute('data-loading','true');
       mainImgEl.dataset.index = 0;
       mainImgEl.addEventListener('load', ()=>{
@@ -1023,376 +1084,350 @@ html, body { overflow-x: hidden; }
         const idx = Number(mainImgEl.dataset.index || 0);
         openFs(idx);
       });
+    }
 
-      // info area entrance
-      setTimeout(()=> document.querySelector('.info').classList.add('in'), 260);
+    // info area entrance
+    const infoEl = document.querySelector('.info');
+    if(infoEl) setTimeout(()=> infoEl.classList.add('in'), 260);
 
-      document.getElementById('inc').addEventListener('click', ()=>{ let q=+document.getElementById('qty').value||1; document.getElementById('qty').value = q+1; });
-      document.getElementById('dec').addEventListener('click', ()=>{ let q=+document.getElementById('qty').value||1; if(q>1) document.getElementById('qty').value = q-1; });
+    // qty controls
+    safeOn('inc', 'click', ()=>{ const q = $('qty'); if(q) q.value = Number(q.value||1) + 1; });
+    safeOn('dec', 'click', ()=>{ const q = $('qty'); if(q && Number(q.value) > 1) q.value = Number(q.value) - 1; });
 
-      document.getElementById('add-cart').addEventListener('click', ()=> {
-        const qty = Math.max(1, parseInt(document.getElementById('qty').value||'1'));
-        const existing = cart.find(i=>i.id == p.id);
-        if(existing) existing.quantity = Number(existing.quantity || 0) + qty;
-        else cart.push({ id: p.id, name: p.name, price: Number(p.price)||0, quantity: qty, image: images[0]||'', link: window.location.href });
+    // add to cart (store both currency columns)
+    const addCartBtn = $('add-cart');
+    if(addCartBtn){
+      addCartBtn.addEventListener('click', ()=> {
+        const qty = Math.max(1, parseInt($('qty').value||'1'));
+        const existing = cart.find(i=> i.id == p.id);
+        const p_qar = Number(p.price_qar ?? p.price ?? 0);
+        const p_bdt = Number(p.price_bdt ?? p.price ?? 0);
+        if(existing){
+          existing.quantity = Number(existing.quantity || 0) + qty;
+          existing.price_qar = existing.price_qar || p_qar;
+          existing.price_bdt = existing.price_bdt || p_bdt;
+        } else {
+          cart.push({
+            id: p.id,
+            name: p.name,
+            price_qar: p_qar,
+            price_bdt: p_bdt,
+            quantity: qty,
+            image: images[0]||'',
+            link: window.location.href
+          });
+        }
         saveCart();
         openCart();
       });
-
-      // mark AI promo to animate in after product content
-      setTimeout(()=> document.getElementById('aiPromo').classList.add('in'), 420);
-
-      // navbar ready class for stagger
-      requestAnimationFrame(()=> document.querySelector('.navbar').classList.add('ready'));
-
-      // initialize the "more" pane after product loaded
-      initMorePanel();
-
-      // store images array for viewer usage
-      window.__productImages = images.slice(); // clone
     }
 
-    // --- POPUP VIEWER LOGIC ---
-    const fsViewer = document.getElementById('fs-viewer');
-    const fsImg = document.getElementById('fs-img');
-    const fsCloseBtn = fsViewer.querySelector('.fs-close');
-    const fsPrevBtn = fsViewer.querySelector('.fs-prev');
-    const fsNextBtn = fsViewer.querySelector('.fs-next');
-    let fsCurrent = 0;
+    // mark AI promo to animate in after product content
+    const aiPromo = $('aiPromo');
+    if(aiPromo) setTimeout(()=> aiPromo.classList.add('in'), 420);
 
-    function openFs(index = 0){
-      const imgs = window.__productImages || [''];
-      if(!imgs || imgs.length === 0) return;
-      fsCurrent = index || 0;
-      if(fsCurrent < 0) fsCurrent = 0;
-      if(fsCurrent >= imgs.length) fsCurrent = imgs.length - 1;
-      fsImg.src = imgs[fsCurrent] || '';
-      fsViewer.classList.add('visible');
-      fsViewer.setAttribute('aria-hidden','false');
-      // focus for keyboard controls
-      fsCloseBtn.focus();
-      document.addEventListener('keydown', fsKeyHandler);
-    }
-    function closeFs(){
-      fsViewer.classList.remove('visible');
-      fsViewer.setAttribute('aria-hidden','true');
-      fsImg.src = '';
-      document.removeEventListener('keydown', fsKeyHandler);
-    }
-    function showFs(i){
-      const imgs = window.__productImages || [''];
-      if(imgs.length === 0) return;
-      fsCurrent = (i + imgs.length) % imgs.length;
-      fsImg.src = imgs[fsCurrent] || '';
-    }
-    function fsKeyHandler(e){
-      if(e.key === 'Escape'){ closeFs(); return; }
-      if(e.key === 'ArrowLeft'){ showFs(fsCurrent - 1); return; }
-      if(e.key === 'ArrowRight'){ showFs(fsCurrent + 1); return; }
-    }
-    fsCloseBtn.addEventListener('click', closeFs);
-    fsPrevBtn.addEventListener('click', ()=> showFs(fsCurrent - 1));
-    fsNextBtn.addEventListener('click', ()=> showFs(fsCurrent + 1));
-    // click outside card closes (on background)
-    fsViewer.querySelector('.fs-bg').addEventListener('click', closeFs);
+    // navbar ready class for stagger
+    const nav = document.querySelector('.navbar'); if(nav) requestAnimationFrame(()=> nav.classList.add('ready'));
 
-    // Expose minimal addToCart for quick interactions (used by more-grid)
-    function addToCart(p) {
-      let found = cart.find(i => i.id === p.id);
-      if (found) {
-        found.quantity = Number(found.quantity || 0) + 1;
-      } else {
-        cart.push({
-          id: p.id,
-          name: p.name || 'Product',
-          price: Number(p.price) || 0,
-          quantity: 1,
-          image: p.image || '',
-          link: `product.html?id=${p.id}`
-        });
-      }
-      saveCart();
-      // show cart briefly if you want:
-      // openCart();
-    }
+    // initialize the "more" pane after product loaded
+    initMorePanel();
 
-    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','/':'&#x2F;'}[c])); }
+    // store images array for viewer usage
+    window.__productImages = images.slice(); // clone
+  } // end loadProduct
 
-    // initial render
-    try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
-    renderCart();
-    updateCartCount();
-    loadProduct();
+  // --- POPUP VIEWER LOGIC ---
+  const fsViewer = $('fs-viewer');
+  const fsImg = $('fs-img');
+  const fsCloseBtn = fsViewer ? fsViewer.querySelector('.fs-close') : null;
+  const fsPrevBtn = fsViewer ? fsViewer.querySelector('.fs-prev') : null;
+  const fsNextBtn = fsViewer ? fsViewer.querySelector('.fs-next') : null;
+  let fsCurrent = 0;
 
-    /* ---------------------------
-       Extra small UX polish:
-       - bump cart-toggle when cart count changes
-       - small exit animation when user uses the "Go Back" control (plays then navigates)
-       --------------------------- */
+  function openFs(index = 0){
+    const imgs = window.__productImages || [''];
+    if(!imgs || imgs.length === 0) return;
+    fsCurrent = index || 0;
+    if(fsCurrent < 0) fsCurrent = 0;
+    if(fsCurrent >= imgs.length) fsCurrent = imgs.length - 1;
+    if(fsImg) fsImg.src = imgs[fsCurrent] || '';
+    if(fsViewer) { fsViewer.classList.add('visible'); fsViewer.setAttribute('aria-hidden','false'); }
+    if(fsCloseBtn) fsCloseBtn.focus();
+    document.addEventListener('keydown', fsKeyHandler);
+  }
+  function closeFs(){
+    if(fsViewer) fsViewer.classList.remove('visible');
+    if(fsViewer) fsViewer.setAttribute('aria-hidden','true');
+    if(fsImg) fsImg.src = '';
+    document.removeEventListener('keydown', fsKeyHandler);
+  }
+  function showFs(i){
+    const imgs = window.__productImages || [''];
+    if(imgs.length === 0) return;
+    fsCurrent = (i + imgs.length) % imgs.length;
+    if(fsImg) fsImg.src = imgs[fsCurrent] || '';
+  }
+  function fsKeyHandler(e){
+    if(e.key === 'Escape'){ closeFs(); return; }
+    if(e.key === 'ArrowLeft'){ showFs(fsCurrent - 1); return; }
+    if(e.key === 'ArrowRight'){ showFs(fsCurrent + 1); return; }
+  }
+  if(fsCloseBtn) fsCloseBtn.addEventListener('click', closeFs);
+  if(fsPrevBtn) fsPrevBtn.addEventListener('click', ()=> showFs(fsCurrent - 1));
+  if(fsNextBtn) fsNextBtn.addEventListener('click', ()=> showFs(fsCurrent + 1));
+  if(fsViewer){
+    const bg = fsViewer.querySelector('.fs-bg');
+    if(bg) bg.addEventListener('click', closeFs);
+  }
 
-    // bump function
-    function triggerCartBump(){
-      cartToggle.classList.remove('bump');
-      void cartToggle.offsetWidth;
-      cartToggle.classList.add('bump');
-      setTimeout(()=> cartToggle.classList.remove('bump'), 900);
-    }
-
-    // watch cart count changes (MutationObserver)
-    (function watchCartCount(){
-      const countNode = cartToggle.querySelector('.count');
-      if(!countNode) return;
-      const mo = new MutationObserver(() => {
-        triggerCartBump();
+  // Expose minimal addToCart for quick interactions (used by more-grid)
+  function addToCart(p){
+    let found = cart.find(i => i.id === p.id);
+    const p_qar = Number(p.price_qar ?? p.price ?? 0);
+    const p_bdt = Number(p.price_bdt ?? p.price ?? 0);
+    if(found){
+      found.quantity = Number(found.quantity || 0) + 1;
+      found.price_qar = found.price_qar || p_qar;
+      found.price_bdt = found.price_bdt || p_bdt;
+    } else {
+      cart.push({
+        id: p.id,
+        name: p.name || 'Product',
+        price_qar: p_qar,
+        price_bdt: p_bdt,
+        quantity: 1,
+        image: p.image || '',
+        link: `product.html?id=${p.id}`
       });
-      mo.observe(countNode, { childList: true, characterData: true, subtree: true });
-    })();
-
-    // Add small exit animation for the "Go Back" control while preserving its logic.
-    (function enhanceGoBack(){
-      const anchors = Array.from(document.querySelectorAll('.wrap a'));
-      const goBack = anchors.find(a => a.textContent && a.textContent.trim().startsWith('←'));
-      if(!goBack) return;
-      goBack.addEventListener('click', function(e){
-        e.preventDefault();
-        document.documentElement.classList.add('page-exit');
-        const prod = document.getElementById('product-area');
-        if(prod) prod.style.pointerEvents = 'none';
-        setTimeout(()=> {
-          try {
-            if (history.length > 1) history.back();
-            else window.location.href = 'index.html';
-          } catch(err) {
-            window.location.href = 'index.html';
-          }
-        }, 420);
-      }, { capture: true });
-    })();
-
-    // Respect reduced-motion: if user prefers reduced motion, skip animations instantly
-    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-      document.querySelectorAll('.thumbs img, .info, .gallery .main-img, .ai-promo').forEach(el => el.classList.add('in'));
-      document.querySelector('.navbar') && document.querySelector('.navbar').classList.add('ready');
     }
+    saveCart();
+  }
 
-    /* -----------------------------
-       NEW: "More products" interactive system
-       - three views: category / trending / suggested
-       - client-side paging (Load more)
-       - reuses supabase client, excludes current product
-       - animated reveal + navigation
-       ----------------------------- */
+  // initial render
+  try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
+  renderCart();
+  updateCartCount();
+  if($('product-area')) loadProduct();
 
-    const moreGrid = document.getElementById('moreGrid');
-    const moreLoadBtn = document.getElementById('moreLoadBtn');
-    const tabs = Array.from(document.querySelectorAll('.more-controls .tab'));
+  // UX polish
+  function triggerCartBump(){
+    if(!cartToggle) return;
+    cartToggle.classList.remove('bump');
+    void cartToggle.offsetWidth;
+    cartToggle.classList.add('bump');
+    setTimeout(()=> cartToggle.classList.remove('bump'), 900);
+  }
 
-    let moreState = {
-      view: 'category', // category | trending | suggested
-      page: 0,
-      pageSize: 6,
-      loading: false,
-      exhausted: false, // no more results
-      lastQuerySnapshot: null
-    };
+  (function watchCartCount(){
+    if(!cartToggle) return;
+    const countNode = cartToggle.querySelector('.count');
+    if(!countNode) return;
+    const mo = new MutationObserver(() => { triggerCartBump(); });
+    mo.observe(countNode, { childList: true, characterData: true, subtree: true });
+  })();
 
-    function setActiveTab(view) {
-      moreState.view = view;
-      moreState.page = 0;
-      moreState.exhausted = false;
-      tabs.forEach(t => t.classList.toggle('active', t.dataset.view === view));
-      // clear grid & load
-      moreGrid.innerHTML = '';
-      loadMoreProducts({ reset: true });
-    }
+  (function enhanceGoBack(){
+    const anchors = Array.from(document.querySelectorAll('.wrap a'));
+    const goBack = anchors.find(a => a.textContent && a.textContent.trim().startsWith('←'));
+    if(!goBack) return;
+    goBack.addEventListener('click', function(e){
+      e.preventDefault();
+      document.documentElement.classList.add('page-exit');
+      const prod = $('product-area');
+      if(prod) prod.style.pointerEvents = 'none';
+      setTimeout(()=> {
+        try { if (history.length > 1) history.back(); else window.location.href = 'index.html'; }
+        catch(err) { window.location.href = 'index.html'; }
+      }, 420);
+    }, { capture: true });
+  })();
 
-    tabs.forEach(tab => {
-      tab.addEventListener('click', ()=> setActiveTab(tab.dataset.view));
-      tab.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(tab.dataset.view); }
-      });
+  // respect reduced-motion
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    document.querySelectorAll('.thumbs img, .info, .gallery .main-img, .ai-promo').forEach(el => el.classList.add('in'));
+    const nav = document.querySelector('.navbar'); if(nav) nav.classList.add('ready');
+  }
+
+  // --- More products (keeps previous logic, currency-aware)
+  const moreGrid = $('moreGrid');
+  const moreLoadBtn = $('moreLoadBtn');
+  const tabs = Array.from(document.querySelectorAll('.more-controls .tab'));
+
+  let moreState = { view: 'category', page: 0, pageSize: 6, loading: false, exhausted: false };
+
+  function setActiveTab(view) {
+    moreState.view = view; moreState.page = 0; moreState.exhausted = false;
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.view === view));
+    if(moreGrid) moreGrid.innerHTML = '';
+    loadMoreProducts({ reset: true });
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', ()=> setActiveTab(tab.dataset.view));
+    tab.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(tab.dataset.view); }
     });
+  });
 
-    moreLoadBtn.addEventListener('click', () => loadMoreProducts({ append: true }));
+  if(moreLoadBtn) moreLoadBtn.addEventListener('click', () => loadMoreProducts({ append: true }));
 
-    async function loadMoreProducts({ append = false, reset = false } = {}) {
-      if (moreState.loading) return;
-      moreState.loading = true;
-      moreLoadBtn.textContent = 'Loading...';
-      moreLoadBtn.disabled = true;
+  async function loadMoreProducts({ append = false, reset = false } = {}) {
+    if(!moreGrid || moreState.loading) return;
+    moreState.loading = true;
+    if(moreLoadBtn){ moreLoadBtn.textContent = 'Loading...'; moreLoadBtn.disabled = true; }
 
-      const currentProduct = window.__currentProduct || {};
-      const page = append ? moreState.page + 1 : 0;
-      const limit = moreState.pageSize;
-      const offset = page * limit;
+    const currentProduct = window.__currentProduct || {};
+    const page = append ? moreState.page + 1 : 0;
+    const limit = moreState.pageSize;
+    const offset = page * limit;
 
-      try {
-        let query = supabase.from('products').select('*');
+    try {
+      let query = supabase.from('products').select('*');
+      if (currentProduct.id) query = query.neq('id', currentProduct.id);
 
-        // Exclude current product id
-        if (currentProduct.id) query = query.neq('id', currentProduct.id);
+      if (moreState.view === 'category') {
+        if (currentProduct.category) query = query.eq('category', currentProduct.category);
+        else query = query.order('created_at', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
 
-        // Choose ordering / filters per view
-        if (moreState.view === 'category') {
-          if (currentProduct.category) {
-            query = query.eq('category', currentProduct.category);
-          } else {
-            // fallback to latest
-            query = query.order('created_at', { ascending: false });
-          }
-        } else if (moreState.view === 'trending') {
-          // heuristic for trending: sort by popular-ish fields if present (e.g. created_at desc)
-          // if you have a "popularity" column use that instead
-          query = query.order('created_at', { ascending: false });
-        } else { // suggested
-          // suggested: similar category first, then other recent
-          if (currentProduct.category) {
-            // we'll first fetch matching category (handled by primary query below)
-            query = query.order('created_at', { ascending: false });
-          } else {
-            query = query.order('created_at', { ascending: false });
-          }
-        }
+      const { data, error } = await query.range(offset, offset + limit - 1);
 
-        // pagination: use range for supabase
-        const from = offset;
-        const to = offset + limit - 1;
-        const { data, error } = await query.range(from, to);
-
-        if (error) {
-          console.error('Error loading more products', error);
-          showMoreEmpty('Failed to load products.');
-          moreState.exhausted = true;
-        } else if (!data || data.length === 0) {
-          if (!append) showMoreEmpty('No more products found.');
-          moreState.exhausted = true;
-        } else {
-          // Render results (append or replace)
-          renderMoreProducts(data, { append, page });
-          moreState.page = page;
-          if (data.length < limit) moreState.exhausted = true;
-        }
-      } catch (err) {
-        console.error(err);
+      if (error) {
+        console.error('Error loading more products', error);
         showMoreEmpty('Failed to load products.');
         moreState.exhausted = true;
-      } finally {
-        moreState.loading = false;
-        moreLoadBtn.textContent = moreState.exhausted ? 'No more' : 'Load more';
-        moreLoadBtn.disabled = moreState.exhausted;
+      } else if (!data || data.length === 0) {
+        if (!append) showMoreEmpty('No more products found.');
+        moreState.exhausted = true;
+      } else {
+        renderMoreProducts(data, { append, page });
+        moreState.page = page;
+        if (data.length < limit) moreState.exhausted = true;
       }
+    } catch (err) {
+      console.error(err);
+      showMoreEmpty('Failed to load products.');
+      moreState.exhausted = true;
+    } finally {
+      moreState.loading = false;
+      if(moreLoadBtn){ moreLoadBtn.textContent = moreState.exhausted ? 'No more' : 'Load more'; moreLoadBtn.disabled = moreState.exhausted; }
     }
+  }
 
-    function showMoreEmpty(msg) {
-      moreGrid.innerHTML = `<div class="more-empty">${escapeHtml(msg)}</div>`;
-    }
+  function showMoreEmpty(msg) { if(!moreGrid) return; moreGrid.innerHTML = `<div class="more-empty">${escapeHtml(msg)}</div>`; }
 
-    function renderMoreProducts(items, { append = false, page = 0 } = {}) {
-      if (!append) moreGrid.innerHTML = '';
-      // create card elements with staggered reveal
-      items.forEach((p, idx) => {
-        const card = document.createElement('div');
-        card.className = 'more-card';
-        card.innerHTML = `
-          <div class="thumb"><img src="${escapeHtml((p.image_urls && p.image_urls[0]) ? p.image_urls[0] : '')}" alt="${escapeHtml(p.name)}" /></div>
-          <div class="title">${escapeHtml(p.name || 'Product')}</div>
-          <div class="price">${formatPrice(p.price)}</div>
-        `;
-        // click behaviour: animate exit then navigate
-        card.addEventListener('click', (e) => {
-          e.stopPropagation();
-          // play page exit then navigate
-          document.documentElement.classList.add('page-exit');
-          setTimeout(()=> { window.location.href = `product.html?id=${p.id}`; }, 360);
+  function renderMoreProducts(items, { append = false, page = 0 } = {}) {
+    if(!moreGrid) return;
+    if (!append) moreGrid.innerHTML = '';
+    items.forEach((p, idx) => {
+      const card = document.createElement('div');
+      card.className = 'more-card';
+
+      const sel = getSelectedCurrency();
+      const qarVal = Number(p.price_qar ?? p.price ?? 0);
+      const bdtVal = Number(p.price_bdt ?? p.price ?? 0);
+      const displayVal = sel === 'BDT' ? (bdtVal || qarVal) : (qarVal || bdtVal);
+
+      card.innerHTML = `
+        <div class="thumb"><img src="${escapeHtml((p.image_urls && p.image_urls[0]) ? p.image_urls[0] : '')}" alt="${escapeHtml(p.name)}" /></div>
+        <div class="title">${escapeHtml(p.name || 'Product')}</div>
+        <div class="price">${formatPriceWithLabel(displayVal)}</div>
+      `;
+
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.documentElement.classList.add('page-exit');
+        setTimeout(()=> { window.location.href = `product.html?id=${p.id}`; }, 360);
+      });
+
+      const quickBtn = document.createElement('button');
+      quickBtn.textContent = 'Add';
+      quickBtn.style.position = 'absolute';
+      quickBtn.style.right = '12px';
+      quickBtn.style.bottom = '12px';
+      quickBtn.style.padding = '6px 8px';
+      quickBtn.style.borderRadius = '8px';
+      quickBtn.style.border = 'none';
+      quickBtn.style.background = 'rgba(0,0,0,0.06)';
+      quickBtn.style.fontWeight = '700';
+      quickBtn.style.cursor = 'pointer';
+      quickBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        addToCart({
+          id: p.id,
+          name: p.name,
+          price_qar: Number(p.price_qar ?? p.price ?? 0),
+          price_bdt: Number(p.price_bdt ?? p.price ?? 0),
+          image: (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : ''
         });
-
-        // add "add to cart" hover quick action (interaction only): reveal small button
-        const quickBtn = document.createElement('button');
-        quickBtn.textContent = 'Add';
-        quickBtn.style.position = 'absolute';
-        quickBtn.style.right = '12px';
-        quickBtn.style.bottom = '12px';
-        quickBtn.style.padding = '6px 8px';
-        quickBtn.style.borderRadius = '8px';
-        quickBtn.style.border = 'none';
-        quickBtn.style.background = 'rgba(0,0,0,0.06)';
-        quickBtn.style.fontWeight = '700';
-        quickBtn.style.cursor = 'pointer';
-        quickBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          addToCart({
-            id: p.id,
-            name: p.name,
-            price: Number(p.price)||0,
-            image: (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : ''
-          });
-          showMiniToast('Added to cart');
-          triggerCartBump();
-        });
-        // position container
-        card.style.position = 'relative';
-        // hide button until hover
-        quickBtn.style.opacity = '0';
-        quickBtn.style.transition = 'opacity 220ms var(--easing)';
-        card.addEventListener('mouseenter', ()=> quickBtn.style.opacity = '1');
-        card.addEventListener('mouseleave', ()=> quickBtn.style.opacity = '0');
-        card.appendChild(quickBtn);
-
-        moreGrid.appendChild(card);
-
-        // staggered reveal
-        setTimeout(()=> card.classList.add('in'), 120 + idx * 80 + page * (moreState.pageSize * 40));
+        showMiniToast('Added to cart');
+        triggerCartBump();
       });
-    }
 
-    function showMiniToast(text) {
-      const t = document.createElement('div');
-      t.textContent = text;
-      Object.assign(t.style, {
-        position: 'fixed',
-        bottom: '86px',
-        right: '20px',
-        background: '#143047',
-        color: '#fff',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        zIndex: 9999,
-        opacity: '0',
-        transform: 'translateY(8px)',
-        transition: 'opacity 260ms var(--easing), transform 260ms var(--easing)'
-      });
-      document.body.appendChild(t);
-      requestAnimationFrame(()=> { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
-      setTimeout(()=> {
-        t.style.opacity = '0'; t.style.transform = 'translateY(8px)';
-        setTimeout(()=> t.remove(), 300);
-      }, 1200);
-    }
+      card.style.position = 'relative';
+      quickBtn.style.opacity = '0';
+      quickBtn.style.transition = 'opacity 220ms var(--easing)';
+      card.addEventListener('mouseenter', ()=> quickBtn.style.opacity = '1');
+      card.addEventListener('mouseleave', ()=> quickBtn.style.opacity = '0');
+      card.appendChild(quickBtn);
 
-    // Initialize more panel once product is loaded
-    function initMorePanel(){
-      // default tab = category
-      setActiveTab('category');
-
-      // keyboard shortcut: press 'm' to focus Load more
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'm' && document.activeElement.tagName.toLowerCase() !== 'input') {
-          moreLoadBtn.focus();
-        }
-      });
-    }
-
-    // small util: remove page-exit stuck state when navigating back (bfcache)
-    window.addEventListener('pageshow', (ev) => {
-      document.documentElement.classList.remove('page-exit');
-      document.querySelectorAll('.more-card.in').forEach(c => c.classList.add('in'));
+      moreGrid.appendChild(card);
+      setTimeout(()=> card.classList.add('in'), 120 + idx * 80 + page * (moreState.pageSize * 40));
     });
+  }
 
-    // For safety, if user prefers reduced motion reveal everything quickly
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      document.querySelectorAll('.more-card').forEach(c => c.classList.add('in'));
-    }
+  function showMiniToast(text) {
+    const t = document.createElement('div');
+    t.textContent = text;
+    Object.assign(t.style, {
+      position: 'fixed',
+      bottom: '86px',
+      right: '20px',
+      background: '#143047',
+      color: '#fff',
+      padding: '8px 12px',
+      borderRadius: '8px',
+      zIndex: 9999,
+      opacity: '0',
+      transform: 'translateY(8px)',
+      transition: 'opacity 260ms var(--easing), transform 260ms var(--easing)'
+    });
+    document.body.appendChild(t);
+    requestAnimationFrame(()=> { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+    setTimeout(()=> {
+      t.style.opacity = '0'; t.style.transform = 'translateY(8px)';
+      setTimeout(()=> t.remove(), 300);
+    }, 1200);
+  }
 
-  </script>
+  function initMorePanel(){
+    try{ setActiveTab('category'); } catch(e){}
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'm' && document.activeElement.tagName.toLowerCase() !== 'input') {
+        if(moreLoadBtn) moreLoadBtn.focus();
+      }
+    });
+  }
+
+  // small util: remove page-exit stuck state when navigating back (bfcache)
+  window.addEventListener('pageshow', (ev) => {
+    document.documentElement.classList.remove('page-exit');
+    document.querySelectorAll('.more-card.in').forEach(c => c.classList.add('in'));
+  });
+
+  // For safety, if user prefers reduced motion reveal everything quickly
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.more-card').forEach(c => c.classList.add('in'));
+  }
+
+  // expose handy siteCurrency for debugging/testing
+  window.__siteCurrency = {
+    get: getSelectedCurrency,
+    set: (v) => { setSelectedCurrency(v); renderCart(); if($('product-area')) loadProduct(); }
+  };
+</script>
+
 </body>
 </html>
