@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta http-equiv="Cache-Control" content="no-store" />
 
   <title>Rongtuli-Categorie</title>
 
@@ -854,11 +853,27 @@
     set: (v) => { setSelectedCurrency(v); renderCart(); loadCategory(); }
   };
 
+   function initCategoryPage() {
+  loadCatalog();   // your function to render the catalog
+  renderCart();    // re-render cart
+  updateCartCount();
+}
+
+// normal load
+window.addEventListener('DOMContentLoaded', initCategoryPage);
+
+// handle back/forward cache
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {  // true if page restored from bfcache
+    initCategoryPage();
+  }
+});
    
 </script>
 
 </body>
 </html>
+
 
 
 
