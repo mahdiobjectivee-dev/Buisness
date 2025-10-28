@@ -627,72 +627,102 @@ html, body { overflow-x: hidden; }
 <div><footer id="foot">© <span id="year"></span> Rongtuli</footer></div>
 
   <!-- Scripts -->
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+ <script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    // Use a reliable Fuse CDN
-    const FUSE_URL = 'https://unpkg.com/fuse.js@6.6.2/dist/fuse.min.js';
+  // Use a reliable Fuse CDN
+  const FUSE_URL = 'https://unpkg.com/fuse.js@6.6.2/dist/fuse.min.js';
 
-    const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
+  const SUPABASE_URL = 'https://qhslurjvanppitwuuxtv.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    let products = [];
-    let fuse = null;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const resultsEl = document.getElementById('results');
-    const statusEl = document.getElementById('status');
-    const searchInput = document.getElementById('aiQuery');
-    const suggestionsEl = document.getElementById('suggestions');
-    document.getElementById('year').textContent = new Date().getFullYear();
+  // global-ish
+  let products = [];
+  let fuse = null;
 
-    // small debounce helper
-    function debounce(fn, wait = 250) {
-      let t;
-      return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
-    }
+  // DOM refs (guarded)
+  const resultsEl = document.getElementById('results');
+  const statusEl = document.getElementById('status');
+  const searchInput = document.getElementById('aiQuery');
+  const suggestionsEl = document.getElementById('suggestions');
+  document.getElementById('year') && (document.getElementById('year').textContent = new Date().getFullYear());
 
-    async function loadFuse() {
-      if (window.Fuse) return;
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = FUSE_URL;
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('Failed to load Fuse.js from CDN'));
-        document.head.appendChild(s);
-      });
-    }
+  // small debounce helper
+  function debounce(fn, wait = 250) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+  }
 
-    async function loadProducts() {
-      statusEl.textContent = 'Loading products ...';
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('id, name, description, category, price, sku, image_urls')
-          .order('created_at', { ascending: false });
+  async function loadFuse() {
+    if (window.Fuse) return;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = FUSE_URL;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load Fuse.js from CDN'));
+      document.head.appendChild(s);
+    });
+  }
 
-        if (error) {
-          console.error(error);
-          statusEl.textContent = 'Error loading products.';
-          products = [];
-          return;
-        }
+  /* -------------------------
+     CURRENCY HELPERS
+     - Uses localStorage.site_currency (default 'QAR')
+     - formatPriceWithLabel(amount) -> "QAR 10.00" or "BDT 10.00"
+     ------------------------- */
+  const CURRENCY_KEY = 'site_currency';
+  function getSelectedCurrency(){ return (localStorage.getItem(CURRENCY_KEY) || 'QAR').toUpperCase(); }
+  function setSelectedCurrency(v){ localStorage.setItem(CURRENCY_KEY, (v||'QAR').toUpperCase()); }
+  function formatPriceWithLabel(amount){
+    const cur = getSelectedCurrency();
+    const n = Number(amount) || 0;
+    return (cur === 'BDT' ? 'BDT ' : 'QAR ') + n.toFixed(2);
+  }
+  // backwards-compat alias
+  function formatPrice(n){ return formatPriceWithLabel(n); }
 
-        products = (data || []).map(p => ({
-          id: p.id,
-          name: p.name || '',
-          description: p.description || '',
-          category: p.category || '',
-          price: p.price || 0,
-          sku: p.sku || '',
-          image: (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : ''
-        }));
+  // escape helper
+  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`=\/]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','/':'&#x2F;'}[c])); }
 
-        await loadFuse();
+  /* -------------------------
+     Load products from Supabase (now fetches price_qar & price_bdt)
+     - Builds local `products` array used by Fuse and rendering
+     ------------------------- */
+  async function loadProducts() {
+    if (statusEl) statusEl.textContent = 'Loading products ...';
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, description, category, price, price_qar, price_bdt, sku, image_urls')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error(error);
+        if (statusEl) statusEl.textContent = 'Error loading products.';
+        products = [];
+        return;
+      }
+
+      products = (data || []).map(p => ({
+        id: p.id,
+        name: p.name || '',
+        description: p.description || '',
+        category: p.category || '',
+        // store both numeric currencies; fall back to legacy 'price' if present
+        price_qar: Number(p.price_qar ?? p.price ?? 0),
+        price_bdt: Number(p.price_bdt ?? p.price ?? 0),
+        price_legacy: Number(p.price ?? 0),
+        sku: p.sku || '',
+        image: (p.image_urls && p.image_urls[0]) ? p.image_urls[0] : ''
+      }));
+
+      await loadFuse();
+      if (window.Fuse) {
         fuse = new window.Fuse(products, {
           includeScore: true,
           shouldSort: true,
-          threshold: 0.45, // fuzzy sensitivity
+          threshold: 0.45,
           keys: [
             { name: 'name', weight: 0.5 },
             { name: 'description', weight: 0.3 },
@@ -700,462 +730,520 @@ html, body { overflow-x: hidden; }
             { name: 'sku', weight: 0.1 }
           ]
         });
-
-        statusEl.textContent = `Loaded ${products.length} products. Type a natural query!`;
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = 'Failed to load product data.';
       }
+
+      if (statusEl) statusEl.textContent = `Loaded ${products.length} products. Type a natural query!`;
+    } catch (err) {
+      console.error(err);
+      if (statusEl) statusEl.textContent = 'Failed to load product data.';
+    }
+  }
+
+  /* -------------------------
+     AI rewriter (same as you had)
+  ------------------------- */
+  async function rewriteQueryWithAI(userInput) {
+    try {
+      const res = await fetch('https://rongtuli-smoky.vercel.app//api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `You are a shopping assistant. Convert this user search phrase into short keyword phrases (comma-separated). Return only the keywords, no extra text.\n\n${userInput}`
+        })
+      });
+      const data = await res.json();
+      return data.reply || userInput;
+    } catch (err) {
+      console.warn('AI rewrite failed, using raw input', err);
+      return userInput;
+    }
+  }
+
+  /* -------------------------
+     Suggestions (Fuse-based)
+  ------------------------- */
+  function getLiveSuggestions(partial, limit = 8) {
+    if (!partial || !fuse) return [];
+    const res = fuse.search(partial, { limit });
+    const seen = new Set();
+    const suggestions = [];
+    for (const r of res) {
+      const item = r.item;
+      const name = item.name || '';
+      if (name && !seen.has(name.toLowerCase())) {
+        suggestions.push({ text: name, item });
+        seen.add(name.toLowerCase());
+      }
+      if (item.category && !seen.has(item.category.toLowerCase())) {
+        suggestions.push({ text: item.category, item: null });
+        seen.add(item.category.toLowerCase());
+      }
+      if (suggestions.length >= limit) break;
+    }
+    return suggestions;
+  }
+
+  // render suggestion dropdown
+  let suggestionIndex = -1;
+  function showSuggestions(list) {
+    if(!suggestionsEl) return;
+    suggestionsEl.innerHTML = '';
+    suggestionIndex = -1;
+    if (!list || list.length === 0) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); return; }
+    list.forEach((s, idx) => {
+      const div = document.createElement('div');
+      div.className = 'suggestion-item';
+      div.textContent = s.text;
+      const countSpan = document.createElement('span');
+      countSpan.style.fontSize = '12px';
+      countSpan.style.color = '#6b7280';
+      countSpan.textContent = s.item ? (s.item.category || '') : '';
+      div.appendChild(countSpan);
+      div.addEventListener('click', () => {
+        if (searchInput) searchInput.value = s.text;
+        suggestionsEl.style.display = 'none';
+        suggestionsEl.classList.remove('in');
+        doSearch(s.text);
+      });
+      suggestionsEl.appendChild(div);
+    });
+    suggestionsEl.style.display = 'block';
+    requestAnimationFrame(()=> {
+      suggestionsEl.classList.add('in');
+      const items = suggestionsEl.querySelectorAll('.suggestion-item');
+      items.forEach((it, i) => setTimeout(()=> it.classList.add('visible'), i * 60));
+    });
+  }
+
+  function moveSuggestion(delta) {
+    if(!suggestionsEl) return;
+    const items = suggestionsEl.querySelectorAll('.suggestion-item');
+    if (!items.length) return;
+    suggestionIndex = Math.max(0, Math.min(items.length - 1, suggestionIndex + delta));
+    items.forEach((it, i) => it.classList.toggle('active', i === suggestionIndex));
+    if (items[suggestionIndex]) {
+      searchInput.value = items[suggestionIndex].firstChild.textContent;
+    }
+  }
+
+  /* -------------------------
+     Search & render logic (currency-aware)
+  ------------------------- */
+  async function doSearch(q) {
+    q = (q || '').trim();
+    if (suggestionsEl) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); }
+    if (!q) {
+      renderResults([]);
+      if (statusEl) statusEl.textContent = 'Enter search text.';
+      return;
+    }
+    if (statusEl) statusEl.textContent = `Thinking about: "${q}"...`;
+
+    const aiQuery = await rewriteQueryWithAI(q);
+    let hits = [];
+    if (fuse) {
+      hits = fuse.search(aiQuery, { limit: 50 }).map(r => ({ ...r.item, score: r.score }));
+    } else {
+      const term = aiQuery.toLowerCase();
+      hits = products.filter(p =>
+        (p.name + ' ' + p.description + ' ' + p.category)
+          .toLowerCase()
+          .includes(term)
+      ).slice(0, 50);
     }
 
-    // AI rewriter: convert user phrase to keywords (fallbacks to plain text on error)
-    async function rewriteQueryWithAI(userInput) {
-  try {
-    const res = await fetch('https://rongtuli-smoky.vercel.app//api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: `You are a shopping assistant. Convert this user search phrase into short keyword phrases (comma-separated). Return only the keywords, no extra text.\n\n${userInput}`
-      })
+    if (!hits || hits.length === 0) {
+      if (statusEl) statusEl.textContent = `No exact matches for "${q}". Showing closest alternatives.`;
+      if (fuse) {
+        const loose = new window.Fuse(products, { keys: ['name','description','category'], threshold: 0.7 });
+        const alt = loose.search(q, { limit: 12 }).map(r => r.item);
+        renderNoResultsWithAlternatives(q, alt);
+      } else {
+        renderNoResultsWithAlternatives(q, []);
+      }
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = `Found ${hits.length} results for "${q}".`;
+    renderResults(hits.map(h => ({ ...h })));
+  }
+
+  function renderNoResultsWithAlternatives(q, alternatives) {
+    if(!resultsEl) return;
+    resultsEl.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'no-results';
+    box.innerHTML = `<div style="font-weight:800;margin-bottom:6px">No matching items found for "<em>${escapeHtml(q)}</em>"</div>
+      <div style="color:#6b7280">We found these similar items — maybe one fits:</div>`;
+    resultsEl.appendChild(box);
+
+    requestAnimationFrame(()=> {
+      resultsEl.classList.add('in');
+      box.classList.add('in');
     });
 
-    const data = await res.json();
-    return data.reply || userInput;
-  } catch (err) {
-    console.warn('AI rewrite failed, using raw input', err);
-    return userInput;
+    if (!alternatives || alternatives.length === 0) {
+      const msg = document.createElement('div');
+      msg.style.padding = '12px';
+      msg.style.color = '#6b7280';
+      msg.textContent = 'No close alternatives found. Try different words (e.g., "hand accessory", "glove", "bangle").';
+      resultsEl.appendChild(msg);
+      return;
+    }
+
+    const sel = getSelectedCurrency();
+
+    alternatives.forEach((p, idx) => {
+      const displayVal = sel === 'BDT' ? (p.price_bdt || p.price_qar || p.price_legacy) : (p.price_qar || p.price_bdt || p.price_legacy);
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      card.innerHTML = `
+        <div class="product-thumb"><img src="${p.image || 'https://via.placeholder.com/200x150?text=No+Image'}" alt="${escapeHtml(p.name)}"></div>
+        <div class="product-name">${escapeHtml(p.name)}</div>
+        <div class="product-price">${formatPriceWithLabel(displayVal)}</div>
+        <div class="meta">${escapeHtml(p.category || '')} ${p.sku ? '• SKU: ' + escapeHtml(p.sku) : ''}</div>
+        <div class="small">${escapeHtml((p.description||'').slice(0,100))}</div>
+        <button class="add-btn">Add to Cart</button>
+      `;
+      // wire add + navigation with exit animation
+      card.querySelector('.add-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        addToCartFromProductObj(p);
+        showToast('Added to cart');
+        triggerCartBump();
+      });
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        animateExitThenNavigate(`product.html?id=${p.id}`);
+      });
+
+      resultsEl.appendChild(card);
+
+      const img = card.querySelector('.product-thumb img');
+      img.setAttribute('data-loading','true');
+      img.addEventListener('load', ()=> img.classList.add('in'));
+      setTimeout(()=> { img.classList.add('in'); card.classList.add('in'); }, 220 + idx * 80);
+    });
   }
-}
 
-    // Create suggestions from partial input using Fuse (fast)
-    function getLiveSuggestions(partial, limit = 8) {
-      if (!partial || !fuse) return [];
-      const res = fuse.search(partial, { limit });
-      // return unique names + categories (short)
-      const seen = new Set();
-      const suggestions = [];
-      for (const r of res) {
-        const item = r.item;
-        const name = item.name || '';
-        if (name && !seen.has(name.toLowerCase())) {
-          suggestions.push({ text: name, item });
-          seen.add(name.toLowerCase());
-        }
-        if (item.category && !seen.has(item.category.toLowerCase())) {
-          suggestions.push({ text: item.category, item: null });
-          seen.add(item.category.toLowerCase());
-        }
-        if (suggestions.length >= limit) break;
-      }
-      return suggestions;
-    }
-
-    // render suggestion dropdown
-    let suggestionIndex = -1;
-    function showSuggestions(list) {
-      suggestionsEl.innerHTML = '';
-      suggestionIndex = -1;
-      if (!list || list.length === 0) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); return; }
-      list.forEach((s, idx) => {
-        const div = document.createElement('div');
-        div.className = 'suggestion-item';
-        div.textContent = s.text;
-        const countSpan = document.createElement('span');
-        countSpan.style.fontSize = '12px';
-        countSpan.style.color = '#6b7280';
-        countSpan.textContent = s.item ? (s.item.category || '') : '';
-        div.appendChild(countSpan);
-        div.addEventListener('click', () => {
-          searchInput.value = s.text;
-          suggestionsEl.style.display = 'none';
-          suggestionsEl.classList.remove('in');
-          doSearch(s.text);
-        });
-        suggestionsEl.appendChild(div);
-      });
-      suggestionsEl.style.display = 'block';
-      // animate visible and stagger children
-      requestAnimationFrame(()=> {
-        suggestionsEl.classList.add('in');
-        const items = suggestionsEl.querySelectorAll('.suggestion-item');
-        items.forEach((it, i) => setTimeout(()=> it.classList.add('visible'), i * 60));
-      });
-    }
-
-    // keyboard navigation for suggestions
-    function moveSuggestion(delta) {
-      const items = suggestionsEl.querySelectorAll('.suggestion-item');
-      if (!items.length) return;
-      suggestionIndex = Math.max(0, Math.min(items.length - 1, suggestionIndex + delta));
-      items.forEach((it, i) => it.classList.toggle('active', i === suggestionIndex));
-      if (items[suggestionIndex]) {
-        // set input value live to show selection
-        searchInput.value = items[suggestionIndex].firstChild.textContent;
-      }
-    }
-
-    // main search (uses AI rewrite then Fuse)
-    async function doSearch(q) {
-      q = (q || '').trim();
-      suggestionsEl.style.display = 'none';
-      suggestionsEl.classList.remove('in');
-      if (!q) {
-        renderResults([]);
-        statusEl.textContent = 'Enter search text.';
-        return;
-      }
-
-      statusEl.textContent = `Thinking about: "${q}"...`;
-
-      const aiQuery = await rewriteQueryWithAI(q);
-      let hits = [];
-      if (fuse) {
-        // try an exact-ish search first
-        hits = fuse.search(aiQuery, { limit: 50 }).map(r => ({ ...r.item, score: r.score }));
-      } else {
-        const term = aiQuery.toLowerCase();
-        hits = products.filter(p =>
-          (p.name + ' ' + p.description + ' ' + p.category)
-            .toLowerCase()
-            .includes(term)
-        ).slice(0, 50);
-      }
-
-      if (!hits || hits.length === 0) {
-        // no exact hits -> show no-results but also show CLOSE matches using looser threshold
-        statusEl.textContent = `No exact matches for "${q}". Showing closest alternatives.`;
-        // fallback: run Fuse again with relaxed threshold and return top 6
-        if (fuse) {
-          const loose = new window.Fuse(products, { keys: ['name','description','category'], threshold: 0.7 });
-          const alt = loose.search(q, { limit: 12 }).map(r => r.item);
-          renderNoResultsWithAlternatives(q, alt);
-        } else {
-          renderNoResultsWithAlternatives(q, []);
-        }
-        return;
-      }
-
-      statusEl.textContent = `Found ${hits.length} results for "${q}".`;
-      renderResults(hits.map(h => ({ ...h })));
-    }
-
-    function renderNoResultsWithAlternatives(q, alternatives) {
-      resultsEl.innerHTML = '';
-      const box = document.createElement('div');
-      box.className = 'no-results';
-      box.innerHTML = `<div style="font-weight:800;margin-bottom:6px">No matching items found for "<em>${escapeHtml(q)}</em>"</div>
-        <div style="color:#6b7280">We found these similar items — maybe one fits:</div>`;
-      resultsEl.appendChild(box);
-      // animate results container and the box
-      requestAnimationFrame(()=> {
-        resultsEl.classList.add('in');
-        box.classList.add('in');
-      });
-
-      if (!alternatives || alternatives.length === 0) {
-        const msg = document.createElement('div');
-        msg.style.padding = '12px';
-        msg.style.color = '#6b7280';
-        msg.textContent = 'No close alternatives found. Try different words (e.g., "hand accessory", "glove", "bangle").';
-        resultsEl.appendChild(msg);
-        return;
-      }
-
-      alternatives.forEach((p, idx) => {
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.innerHTML = `
-          <div class="product-thumb"><img src="${p.image || 'https://via.placeholder.com/200x150?text=No+Image'}" alt="${escapeHtml(p.name)}"></div>
-          <div class="product-name">${escapeHtml(p.name)}</div>
-          <div class="product-price">QAR ${(Number(p.price)||0).toFixed(2)}</div>
-          <div class="meta">${escapeHtml(p.category || '')} ${p.sku ? '• SKU: ' + escapeHtml(p.sku) : ''}</div>
-          <div class="small">${escapeHtml((p.description||'').slice(0,100))}</div>
-          <button class="add-btn">Add to Cart</button>
-        `;
-        // wire add + navigation with exit animation
-        card.querySelector('.add-btn').addEventListener('click', e => {
-          e.stopPropagation(); addToCart(p); showToast('Added to cart'); triggerCartBump();
-        });
-        card.addEventListener('click', (e) => {
-          e.stopPropagation();
-          animateExitThenNavigate(`product.html?id=${p.id}`);
-        });
-
-        resultsEl.appendChild(card);
-
-        // show image and card with stagger
-        const img = card.querySelector('.product-thumb img');
-        img.setAttribute('data-loading','true');
-        img.addEventListener('load', ()=> img.classList.add('in'));
-        // fallback: mark in after delay
-        setTimeout(()=> {
-          img.classList.add('in');
-          card.classList.add('in');
-        }, 220 + idx * 80);
-      });
-    }
-
-    function renderResults(list) {
-      resultsEl.innerHTML = '';
-      if (!list || list.length === 0) {
-        resultsEl.innerHTML = '<div class="no-results in">No matching items found. Try different words.</div>';
-        requestAnimationFrame(()=> resultsEl.classList.add('in'));
-        return;
-      }
-
-      // animate results container in
+  function renderResults(list) {
+    if(!resultsEl) return;
+    resultsEl.innerHTML = '';
+    if (!list || list.length === 0) {
+      resultsEl.innerHTML = '<div class="no-results in">No matching items found. Try different words.</div>';
       requestAnimationFrame(()=> resultsEl.classList.add('in'));
+      return;
+    }
 
-      list.forEach((p, idx) => {
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.innerHTML = `
-          <div class="product-thumb">
-            <img src="${p.image || 'https://via.placeholder.com/200x150?text=No+Image'}" alt="${escapeHtml(p.name)}">
-          </div>
-          <div class="product-name">${escapeHtml(p.name)}</div>
-          <div class="product-price">QAR ${(Number(p.price)||0).toFixed(2)}</div>
-          <div class="meta">${escapeHtml(p.category || '')} ${p.sku ? '• SKU: ' + escapeHtml(p.sku) : ''}</div>
-          <div class="small">${escapeHtml((p.description || '').slice(0,100))}</div>
-          <button class="add-btn">Add to Cart</button>
-        `;
-        card.querySelector('.add-btn').addEventListener('click', e => {
-          e.stopPropagation();
-          addToCart(p);
-          showToast('Added to cart');
-          triggerCartBump();
-        });
-        // intercept clicks to animate exit then navigate
-        card.addEventListener('click', (e) => {
-          e.stopPropagation();
-          animateExitThenNavigate(`product.html?id=${p.id}`);
-        });
+    requestAnimationFrame(()=> resultsEl.classList.add('in'));
 
-        resultsEl.appendChild(card);
+    const sel = getSelectedCurrency();
 
-        // show image and card with stagger
-        const img = card.querySelector('.product-thumb img');
-        img.setAttribute('data-loading','true');
-        img.addEventListener('load', ()=> img.classList.add('in'));
-        // fallback in case load event doesn't fire quickly (or placeholder)
-        setTimeout(()=> {
-          img.classList.add('in');
-          card.classList.add('in');
-        }, 220 + idx * 80);
+    list.forEach((p, idx) => {
+      // p may be the product object (from products array) or come from fuse (same shape)
+      const displayVal = sel === 'BDT' ? (p.price_bdt || p.price_qar || p.price_legacy || 0) : (p.price_qar || p.price_bdt || p.price_legacy || 0);
+
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      card.innerHTML = `
+        <div class="product-thumb">
+          <img src="${p.image || 'https://via.placeholder.com/200x150?text=No+Image'}" alt="${escapeHtml(p.name)}">
+        </div>
+        <div class="product-name">${escapeHtml(p.name)}</div>
+        <div class="product-price">${formatPriceWithLabel(displayVal)}</div>
+        <div class="meta">${escapeHtml(p.category || '')} ${p.sku ? '• SKU: ' + escapeHtml(p.sku) : ''}</div>
+        <div class="small">${escapeHtml((p.description || '').slice(0,100))}</div>
+        <button class="add-btn">Add to Cart</button>
+      `;
+
+      const addBtn = card.querySelector('.add-btn');
+      addBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        addToCartFromProductObj(p);
+        showToast('Added to cart');
+        triggerCartBump();
+      });
+
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        animateExitThenNavigate(`product.html?id=${p.id}`);
+      });
+
+      resultsEl.appendChild(card);
+
+      const img = card.querySelector('.product-thumb img');
+      img.setAttribute('data-loading','true');
+      img.addEventListener('load', ()=> img.classList.add('in'));
+      setTimeout(()=> { img.classList.add('in'); card.classList.add('in'); }, 220 + idx * 80);
+    });
+  }
+
+  function showToast(text) {
+    const t = document.createElement('div');
+    t.textContent = text;
+    Object.assign(t.style, {
+      position: 'fixed',
+      bottom: '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: '#143047',
+      color: '#fff',
+      padding: '8px 12px',
+      borderRadius: '8px',
+      zIndex: 9999
+    });
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 1500);
+  }
+
+  /* -------------------------
+     Cart logic (currency-aware) — integrated & kept behavior
+  ------------------------- */
+  const WHATSAPP_NUMBER = '97451707046';
+  let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+  // migrate legacy cart items to include price_qar and price_bdt
+  (function migrateCart(){
+    if(!Array.isArray(cart)) cart = [];
+    cart = cart.map(it => {
+      if(!it) return it;
+      if(typeof it.price_qar === 'undefined' && typeof it.price_bdt === 'undefined') {
+        const legacy = Number(it.price || 0);
+        it.price_qar = legacy;
+        it.price_bdt = legacy;
+        delete it.price;
+      } else {
+        it.price_qar = Number(it.price_qar || it.price || 0);
+        it.price_bdt = Number(it.price_bdt || it.price || it.price_qar || 0);
+      }
+      return it;
+    });
+    localStorage.setItem('cart', JSON.stringify(cart));
+  })();
+
+  function saveCart(){
+    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem('cart_last_update', Date.now());
+    renderCart();
+    updateCartCount();
+  }
+
+  // DOM refs used by cart (guarded already above but re-select locally to be safe)
+  const cartToggleEl = document.getElementById('cart-toggle');
+  const cartElDom = document.getElementById('cart');
+  const cartRowsDom = document.getElementById('cart-rows');
+  const subtotalElDom = document.getElementById('subtotal');
+  const shippingElDom = document.getElementById('shipping');
+  const totalElDom = document.getElementById('total');
+  const checkoutBtn = document.getElementById('checkout-btn');
+  const cartCloseFooter = document.getElementById('cart-close-footer');
+
+  function updateCartCount(){
+    const qty = cart.reduce((s,i)=> s + (Number(i.quantity)||0), 0);
+    const badge = cartToggleEl && cartToggleEl.querySelector('.count');
+    if (badge) badge.textContent = qty;
+    cartToggleEl && cartToggleEl.setAttribute('aria-label', `Open cart — ${qty} items`);
+  }
+
+  function renderCart(){
+    if(!cartRowsDom) return;
+    cartRowsDom.innerHTML = '';
+    if(!cart || cart.length === 0){
+      cartRowsDom.textContent = 'Cart is empty.';
+    } else {
+      cart.forEach((it, i) => {
+        const row = document.createElement('div');
+        row.className = 'cart-row';
+
+        const img = document.createElement('img');
+        img.className = 'cart-img';
+        img.src = it.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23eee"/></svg>';
+        img.alt = it.name || 'product';
+
+        const txt = document.createElement('div');
+        txt.className = 'cart-text';
+        const title = document.createElement('div');
+        title.textContent = it.name || 'Product';
+
+        const sel = getSelectedCurrency();
+        const perUnit = sel === 'BDT' ? (Number(it.price_bdt || it.price_qar || 0)) : (Number(it.price_qar || it.price_bdt || 0));
+        const meta = document.createElement('div');
+        meta.textContent = `${formatPriceWithLabel(perUnit)} × ${it.quantity}`;
+
+        txt.appendChild(title);
+        txt.appendChild(meta);
+
+        const controls = document.createElement('div');
+        controls.className = 'cart-controls';
+
+        const inc = document.createElement('button'); inc.className = 'small-btn icon'; inc.textContent = '+'; inc.addEventListener('click', (e) => { e.stopPropagation(); cart[i].quantity++; saveCart(); });
+        const dec = document.createElement('button'); dec.className = 'small-btn icon'; dec.textContent = '-'; dec.addEventListener('click', (e) => { e.stopPropagation(); if (cart[i].quantity > 1) cart[i].quantity--; else cart.splice(i,1); saveCart(); });
+        const rem = document.createElement('button'); rem.className = 'small-btn'; rem.textContent = 'Remove'; rem.addEventListener('click', (e) => { e.stopPropagation(); cart.splice(i,1); saveCart(); });
+
+        controls.appendChild(inc); controls.appendChild(dec); controls.appendChild(rem);
+
+        row.appendChild(img);
+        row.appendChild(txt);
+        row.appendChild(controls);
+
+        cartRowsDom.appendChild(row);
       });
     }
 
-    function showToast(text) {
-      const t = document.createElement('div');
-      t.textContent = text;
-      Object.assign(t.style, {
-        position: 'fixed',
-        bottom: '20px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: '#143047',
-        color: '#fff',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        zIndex: 9999
-      });
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 1500);
-    }
+    const sel = getSelectedCurrency();
+    const subtotal = cart.reduce((s,i)=> s + ( (sel === 'BDT' ? Number(i.price_bdt||i.price_qar||0) : Number(i.price_qar||i.price_bdt||0)) ) * i.quantity, 0);
+    const shipping = subtotal > 0 ? 10 : 0;
+    if (subtotalElDom) subtotalElDom.textContent = 'Subtotal: ' + formatPriceWithLabel(subtotal);
+    if (shippingElDom) shippingElDom.textContent = 'Shipping: ' + formatPriceWithLabel(shipping);
+    if (totalElDom) totalElDom.textContent = 'Total: ' + formatPriceWithLabel(subtotal + shipping);
+  }
 
-    /* -------------------------
-       Cart logic (copied & integrated)
-    ------------------------- */
+  // animate cart open/close (non-destructive)
+  function animateCartOpen(){
+    if(!cartElDom) return;
+    cartElDom.classList.remove('hidden','anim-out');
+    void cartElDom.offsetWidth;
+    cartElDom.classList.add('anim-in');
+    cartElDom.style.display = 'block';
+    cartElDom.setAttribute('aria-hidden','false');
+    cartToggleEl && cartToggleEl.setAttribute('aria-expanded','true');
+    cartElDom.scrollTop = 0;
+  }
+  function animateCartClose(){
+    if(!cartElDom) return;
+    cartElDom.classList.remove('anim-in');
+    cartElDom.classList.add('anim-out');
+    cartElDom.setAttribute('aria-hidden','true');
+    cartToggleEl && cartToggleEl.setAttribute('aria-expanded','false');
+    setTimeout(()=> {
+      if (cartElDom.classList.contains('anim-out')) {
+        cartElDom.classList.add('hidden');
+        cartElDom.classList.remove('anim-out');
+        cartElDom.style.display = 'none';
+      }
+    }, 260);
+  }
+  function openCart(){ animateCartOpen(); }
+  function closeCart(){ animateCartClose(); }
+  function toggleCart(){ if(!cartElDom) return; if(cartElDom.classList.contains('hidden')) animateCartOpen(); else animateCartClose(); }
 
-    const WHATSAPP_NUMBER = '97451707046';
-    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+  cartToggleEl && cartToggleEl.addEventListener('click', toggleCart);
+  cartCloseFooter && cartCloseFooter.addEventListener('click', closeCart);
+  checkoutBtn && checkoutBtn.addEventListener('click', () => checkoutWhatsApp());
 
-    function formatPrice(n){ return 'QAR ' + (Number(n)||0).toFixed(2); }
-
-    function saveCart(){
-      localStorage.setItem('cart', JSON.stringify(cart));
-      localStorage.setItem('cart_last_update', Date.now());
+  window.addEventListener('storage', (e) => {
+    if(e.key === 'cart' || e.key === 'cart_last_update'){
+      try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
       renderCart();
       updateCartCount();
+      triggerCartBump();
     }
+  });
 
-    const cartToggle = document.getElementById('cart-toggle');
-    const cartEl = document.getElementById('cart');
-    const cartRows = document.getElementById('cart-rows');
-    const subtotalEl = document.getElementById('subtotal');
-    const shippingEl = document.getElementById('shipping');
-    const totalEl = document.getElementById('total');
-    const checkoutBtn = document.getElementById('checkout-btn');
-    const cartCloseFooter = document.getElementById('cart-close-footer');
-
-    function updateCartCount(){
-      const qty = cart.reduce((s,i)=> s + (Number(i.quantity)||0), 0);
-      const badge = cartToggle.querySelector('.count');
-      if (badge) badge.textContent = qty;
-      cartToggle.setAttribute('aria-label', `Open cart — ${qty} items`);
-    }
-
-    function renderCart(){
-      cartRows.innerHTML = '';
-      if(!cart || cart.length === 0){
-        cartRows.textContent = 'Cart is empty.';
-      } else {
-        cart.forEach((it, i) => {
-          const row = document.createElement('div');
-          row.className = 'cart-row';
-
-          const img = document.createElement('img');
-          img.className = 'cart-img';
-          img.src = it.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" fill="%23eee"/></svg>';
-          img.alt = it.name || 'product';
-
-          const txt = document.createElement('div');
-          txt.className = 'cart-text';
-          const title = document.createElement('div');
-          title.textContent = it.name || 'Product';
-          const meta = document.createElement('div');
-          meta.textContent = `${formatPrice(it.price)} × ${it.quantity}`;
-          txt.appendChild(title);
-          txt.appendChild(meta);
-
-          const controls = document.createElement('div');
-          controls.className = 'cart-controls';
-
-          const inc = document.createElement('button');
-          inc.className = 'small-btn icon';
-          inc.textContent = '+';
-          inc.addEventListener('click', (e) => { e.stopPropagation(); cart[i].quantity++; saveCart(); });
-
-          const dec = document.createElement('button');
-          dec.className = 'small-btn icon';
-          dec.textContent = '-';
-          dec.addEventListener('click', (e) => { e.stopPropagation(); if (cart[i].quantity > 1) cart[i].quantity--; else cart.splice(i,1); saveCart(); });
-
-          const rem = document.createElement('button');
-          rem.className = 'small-btn';
-          rem.textContent = 'Remove';
-          rem.addEventListener('click', (e) => { e.stopPropagation(); cart.splice(i,1); saveCart(); });
-
-          controls.appendChild(inc);
-          controls.appendChild(dec);
-          controls.appendChild(rem);
-
-          row.appendChild(img);
-          row.appendChild(txt);
-          row.appendChild(controls);
-
-          cartRows.appendChild(row);
-        });
-      }
-
-      const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0);
-      const shipping = subtotal > 0 ? 10 : 0;
-      subtotalEl.textContent = 'Subtotal: ' + formatPrice(subtotal);
-      shippingEl.textContent = 'Shipping: ' + formatPrice(shipping);
-      totalEl.textContent = 'Total: ' + formatPrice(subtotal + shipping);
-    }
-
-    // animate cart open/close (non-destructive)
-    function animateCartOpen(){
-      cartEl.classList.remove('hidden','anim-out');
-      void cartEl.offsetWidth;
-      cartEl.classList.add('anim-in');
-      cartEl.style.display = 'block';
-      cartEl.setAttribute('aria-hidden','false');
-      cartToggle.setAttribute('aria-expanded','true');
-      cartEl.scrollTop = 0;
-    }
-    function animateCartClose(){
-      cartEl.classList.remove('anim-in');
-      cartEl.classList.add('anim-out');
-      cartEl.setAttribute('aria-hidden','true');
-      cartToggle.setAttribute('aria-expanded','false');
-      setTimeout(()=> {
-        if (cartEl.classList.contains('anim-out')) {
-          cartEl.classList.add('hidden');
-          cartEl.classList.remove('anim-out');
-          cartEl.style.display = 'none';
-        }
-      }, 260);
-    }
-    function openCart(){ animateCartOpen(); }
-    function closeCart(){ animateCartClose(); }
-    function toggleCart(){ if(cartEl.classList.contains('hidden')) animateCartOpen(); else animateCartClose(); }
-
-    cartToggle.addEventListener('click', toggleCart);
-    cartCloseFooter.addEventListener('click', closeCart);
-    checkoutBtn.addEventListener('click', checkoutWhatsApp);
-
-    window.addEventListener('storage', (e) => {
-      if(e.key === 'cart' || e.key === 'cart_last_update'){
-        try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
-        renderCart();
-        updateCartCount();
-        triggerCartBump();
-      }
+  // WhatsApp checkout (currency-aware)
+  function checkoutWhatsApp() {
+    if (!cart || cart.length === 0) { alert('Cart is empty.'); return; }
+    const sel = getSelectedCurrency();
+    let text = `Order request — items (${sel}):\n\n`;
+    cart.forEach(it => {
+      const unit = sel === 'BDT' ? Number(it.price_bdt || it.price_qar || 0) : Number(it.price_qar || it.price_bdt || 0);
+      text += `${it.name} — ${sel} ${unit.toFixed(2)} × ${it.quantity}\n`;
     });
+    const subtotal = cart.reduce((s,i)=> s + ( (sel === 'BDT' ? Number(i.price_bdt||i.price_qar||0) : Number(i.price_qar||i.price_bdt||0)) ) * i.quantity, 0);
+    const shipping = subtotal > 0 ? 10 : 0;
+    text += `\nSubtotal: ${sel} ${subtotal.toFixed(2)}\nShipping: ${sel} ${shipping.toFixed(2)}\nTotal: ${sel} ${(subtotal+shipping).toFixed(2)}`;
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  }
 
-    // WhatsApp checkout
-    function checkoutWhatsApp() {
-      if (cart.length === 0) { alert('Cart is empty.'); return; }
-      let text = 'Order request — items:\n\n';
-      cart.forEach(it => text += `${it.name} — QAR ${it.price} × ${it.quantity}\n`);
-      const subtotal = cart.reduce((s,i)=> s + (Number(i.price)||0) * i.quantity, 0);
-      const shipping = subtotal > 0 ? 10 : 0;
-      text += `\nSubtotal: QAR ${subtotal.toFixed(2)}\nShipping: QAR ${shipping.toFixed(2)}\nTotal: QAR ${(subtotal+shipping).toFixed(2)}`;
-      const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
-      window.open(url, '_blank');
+  /* -------------------------
+     addToCart helpers:
+     - addToCartFromProductObj(p) accepts product objects from `products`, `fuse` result, or rendered list
+     - it stores price_qar & price_bdt on cart item so totals stay stable even if currency later changes
+  ------------------------- */
+  function addToCartFromProductObj(p) {
+    let found = cart.find(i => i.id === p.id);
+    const p_qar = Number(p.price_qar ?? p.price_legacy ?? 0);
+    const p_bdt = Number(p.price_bdt ?? p.price_legacy ?? 0);
+    if (found) {
+      found.quantity = Number(found.quantity || 0) + 1;
+      // ensure prices present
+      found.price_qar = Number(found.price_qar || p_qar);
+      found.price_bdt = Number(found.price_bdt || p_bdt);
+    } else {
+      const entry = {
+        id: p.id,
+        name: p.name || 'Product',
+        price_qar: p_qar,
+        price_bdt: p_bdt,
+        quantity: 1,
+        image: p.image || '',
+        link: window.location.href
+      };
+      cart.push(entry);
     }
+    saveCart();
+    openCart();
+  }
 
-    /* addToCart used above */
-    function addToCart(p) {
-      let found = cart.find(i => i.id === p.id);
-      if (found) {
-        found.quantity = Number(found.quantity || 0) + 1;
-      } else {
-        const entry = {
-          id: p.id,
-          name: p.name || 'Product',
-          price: Number(p.price) || 0,
-          quantity: 1,
-          image: p.image || '',
-          link: window.location.href
-        };
-        cart.push(entry);
-      }
-      saveCart();
-      openCart();
+  function addToCartLegacy(p) {
+    // kept for compatibility with any legacy call that passes { price } directly
+    let found = cart.find(i => i.id === p.id);
+    const p_qar = Number(p.price || 0);
+    if (found) {
+      found.quantity = Number(found.quantity || 0) + 1;
+      found.price_qar = Number(found.price_qar || p_qar);
+      found.price_bdt = Number(found.price_bdt || p_qar);
+    } else {
+      cart.push({
+        id: p.id,
+        name: p.name || 'Product',
+        price_qar: p_qar,
+        price_bdt: p_qar,
+        quantity: 1,
+        image: p.image || '',
+        link: window.location.href
+      });
     }
+    saveCart();
+    openCart();
+  }
 
-    // helpers
-    function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"'`=\/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#x60;','/':'&#x2F;'}[c])); }
+  // helpers used earlier in page
+  function triggerCartBump(){
+    if(!cartToggleEl) return;
+    cartToggleEl.classList.remove('bump');
+    void cartToggleEl.offsetWidth;
+    cartToggleEl.classList.add('bump');
+    setTimeout(()=> cartToggleEl.classList.remove('bump'), 900);
+  }
 
-    // wiring: search button + Enter + clear
-    document.getElementById('searchBtn').addEventListener('click', () => doSearch(searchInput.value));
-    document.getElementById('clearBtn').addEventListener('click', () => { searchInput.value = ''; renderResults([]); statusEl.textContent = ''; suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); });
+  /* -------------------------
+     Wiring: search button, clear, suggestions typing, keyboard behaviour
+  ------------------------- */
+  const searchBtn = document.getElementById('searchBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  if (searchBtn && searchInput) searchBtn.addEventListener('click', () => doSearch(searchInput.value));
+  if (clearBtn && searchInput) clearBtn.addEventListener('click', () => { searchInput.value = ''; renderResults([]); if(statusEl) statusEl.textContent = ''; if(suggestionsEl){ suggestionsEl.style.display='none'; suggestionsEl.classList.remove('in'); } });
 
-    // debounce user typing: suggestions and live preview
-    const onType = debounce(async () => {
-      const q = searchInput.value.trim();
-      if (!q) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); return; }
-      // show simple suggestions from Fuse
-      const sug = getLiveSuggestions(q, 8);
-      showSuggestions(sug);
-    }, 180);
+  const onType = debounce(async () => {
+    const q = (searchInput && searchInput.value || '').trim();
+    if (!q) { if(suggestionsEl){ suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); } return; }
+    const sug = getLiveSuggestions(q, 8);
+    showSuggestions(sug);
+  }, 180);
 
+  if (searchInput) {
     searchInput.addEventListener('input', onType);
 
-    // keyboard handling for suggestions
     searchInput.addEventListener('keydown', (e) => {
-      const visible = suggestionsEl.style.display !== 'none';
+      const visible = suggestionsEl && suggestionsEl.style.display !== 'none';
       if (visible && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape')) {
         e.preventDefault();
         if (e.key === 'ArrowDown') moveSuggestion(1);
         else if (e.key === 'ArrowUp') moveSuggestion(-1);
         else if (e.key === 'Enter') {
-          const active = suggestionsEl.querySelector('.suggestion-item.active');
+          const active = suggestionsEl && suggestionsEl.querySelector('.suggestion-item.active');
           if (active) { active.click(); }
           else doSearch(searchInput.value);
         } else if (e.key === 'Escape') { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); }
@@ -1163,155 +1251,110 @@ html, body { overflow-x: hidden; }
         doSearch(searchInput.value);
       }
     });
+  }
 
-    // click outside closes suggestions
-    document.addEventListener('click', (ev) => {
-      if (!document.querySelector('.search-bar').contains(ev.target)) {
-        suggestionsEl.style.display = 'none';
-        suggestionsEl.classList.remove('in');
-      }
-    });
-
-    // initial load
-    loadProducts();
-
-    // initial cart render
-    try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
-    renderCart();
-    updateCartCount();
-
-    // small UI helpers for animation UX
-
-    // animate exit then navigate
-    function animateExitThenNavigate(href) {
-      document.documentElement.classList.add('page-exit');
-      // mark visible product cards as out quickly so the page feels responsive
-      document.querySelectorAll('.product-card').forEach(pc => pc.classList.add('out'));
-      setTimeout(()=> { window.location.href = href; }, 380);
-    }
-
-    // bump cart toggle for feedback
-    function triggerCartBump(){
-      cartToggle.classList.remove('bump');
-      void cartToggle.offsetWidth;
-      cartToggle.classList.add('bump');
-      setTimeout(()=> cartToggle.classList.remove('bump'), 900);
-    }
-
-    // enhance "Go Back" anchor to play exit animation before navigation (preserves original logic)
-    (function enhanceGoBack(){
-      const anchors = Array.from(document.querySelectorAll('.wrap a'));
-      const goBack = anchors.find(a => a.textContent && a.textContent.trim().startsWith('←'));
-      if(!goBack) return;
-      goBack.addEventListener('click', function(e){
-        e.preventDefault();
-        document.documentElement.classList.add('page-exit');
-        setTimeout(()=>{
-          try {
-            if (history.length > 1) history.back();
-            else window.location.href = 'index.html';
-          } catch(err) {
-            window.location.href = 'index.html';
-          }
-        }, 380);
-      }, { capture: true });
-    })();
-
-    // mark navbar ready to stagger links
-    requestAnimationFrame(()=> document.querySelector('.navbar') && document.querySelector('.navbar').classList.add('ready'));
-
-    // expose for debugging
-    window._rongtuli_search = { products, doSearch, getLiveSuggestions, cart };
-
-    
-// Add this to the end of your script (search.html)
-(function handlePageRestore() {
-  // Runs when the page is restored from back/forward cache or shown again.
-  window.addEventListener('pageshow', (event) => {
-    // Remove exit/animation classes that hide page when navigating back
-    document.documentElement.classList.remove('page-exit');
-
-    // If you used any anim-out classes on elements, remove them too:
-    document.querySelectorAll('.product-card.out').forEach(el => el.classList.remove('out'));
-    // Remove cart anim classes if left behind
-    const cartEl = document.getElementById('cart');
-    if (cartEl) {
-      cartEl.classList.remove('anim-out');
-      // If cart was hidden but should be hidden, keep it; otherwise re-hide properly
-      if (cartEl.classList.contains('hidden')) {
-        cartEl.style.display = 'none';
-      } else {
-        cartEl.style.display = 'block';
-      }
-    }
-
-    // Reset suggestions UI so it's not stuck visible/hidden-with-style
-    const suggestionsEl = document.getElementById('suggestions');
-    if (suggestionsEl) {
-      suggestionsEl.style.display = 'none';
-      suggestionsEl.classList.remove('in');
-      // remove any item-level visible classes
-      suggestionsEl.querySelectorAll('.suggestion-item.visible, .suggestion-item.active')
-        .forEach(it => it.classList.remove('visible', 'active'));
-    }
-
-    // Restore results area visual state
-    const resultsEl = document.getElementById('results');
-    if (resultsEl) {
-      resultsEl.classList.remove('in');
-      // small deferred re-add so entrance anim can play on restore if desired
-      // but only if the content exists
-      if (resultsEl.children.length) {
-        // re-add in on next frame so CSS transitions run
-        requestAnimationFrame(() => resultsEl.classList.add('in'));
-      } else {
-        // if empty, ensure it's visible (in case CSS hid it)
-        resultsEl.style.opacity = '';
-        resultsEl.style.transform = '';
-      }
-    }
-
-    // Re-render cart UI (keeps count and rows correct after a bfcache restore)
-    try {
-      // reload cart from storage to be safe
-      cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    } catch (err) { cart = []; }
-    renderCart && typeof renderCart === 'function' && renderCart();
-    updateCartCount && typeof updateCartCount === 'function' && updateCartCount();
-
-    // If your products list is empty (e.g. JS didn't run on restore), re-run loadProducts
-    // (only re-fetch if products not already present)
-    if ((!window.products || !window.products.length) && typeof loadProducts === 'function') {
-      loadProducts().catch(() => {/* ignore */});
-    } else {
-      // If products exist, re-initialize Fuse if needed (defensive)
-      if (!window.fuse && typeof window.Fuse !== 'undefined' && typeof loadFuse === 'function') {
-        // attempt to re-create fuse quickly
-        try {
-          window.fuse = new window.Fuse(window.products || [], {
-            includeScore: true,
-            shouldSort: true,
-            threshold: 0.45,
-            keys: [
-              { name: 'name', weight: 0.5 },
-              { name: 'description', weight: 0.3 },
-              { name: 'category', weight: 0.1 },
-              { name: 'sku', weight: 0.1 }
-            ]
-          });
-        } catch (e) { /* ignore */ }
-      }
-    }
-
-    // Re-enable navbar stagger if you'd like it to re-run
-    const nav = document.querySelector('.navbar');
-    if (nav) {
-      nav.classList.remove('ready');
-      requestAnimationFrame(() => nav.classList.add('ready'));
+  document.addEventListener('click', (ev) => {
+    const searchBar = document.querySelector('.search-bar');
+    if (!searchBar || !searchBar.contains(ev.target)) {
+      if (suggestionsEl) { suggestionsEl.style.display = 'none'; suggestionsEl.classList.remove('in'); }
     }
   });
-})();
 
-  </script>
+  /* -------------------------
+     Initial load + cart render
+  ------------------------- */
+  loadProducts();
+  try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch(err){ cart = []; }
+  renderCart();
+  updateCartCount();
+
+  /* -------------------------
+     Small UI helpers & BFCACHE restore handling (kept mostly as-is)
+  ------------------------- */
+  function animateExitThenNavigate(href) {
+    document.documentElement.classList.add('page-exit');
+    document.querySelectorAll('.product-card').forEach(pc => pc.classList.add('out'));
+    setTimeout(()=> { window.location.href = href; }, 380);
+  }
+
+  (function enhanceGoBack(){
+    const anchors = Array.from(document.querySelectorAll('.wrap a'));
+    const goBack = anchors.find(a => a.textContent && a.textContent.trim().startsWith('←'));
+    if(!goBack) return;
+    goBack.addEventListener('click', function(e){
+      e.preventDefault();
+      document.documentElement.classList.add('page-exit');
+      setTimeout(()=>{
+        try {
+          if (history.length > 1) history.back();
+          else window.location.href = 'index.html';
+        } catch(err) {
+          window.location.href = 'index.html';
+        }
+      }, 380);
+    }, { capture: true });
+  })();
+
+  requestAnimationFrame(()=> document.querySelector('.navbar') && document.querySelector('.navbar').classList.add('ready'));
+
+  // expose debug hooks
+  window._rongtuli_search = { products, doSearch, getLiveSuggestions, cart, setSelectedCurrency, getSelectedCurrency };
+
+  // pageshow restore handling (keeps your original cleanup but also re-renders cart/prices to current currency)
+  (function handlePageRestore() {
+    window.addEventListener('pageshow', (event) => {
+      document.documentElement.classList.remove('page-exit');
+      document.querySelectorAll('.product-card.out').forEach(el => el.classList.remove('out'));
+      const cartElR = document.getElementById('cart');
+      if (cartElR) {
+        cartElR.classList.remove('anim-out');
+        if (cartElR.classList.contains('hidden')) { cartElR.style.display = 'none'; } else { cartElR.style.display = 'block'; }
+      }
+      const suggestionsE = document.getElementById('suggestions');
+      if (suggestionsE) {
+        suggestionsE.style.display = 'none';
+        suggestionsE.classList.remove('in');
+        suggestionsE.querySelectorAll('.suggestion-item.visible, .suggestion-item.active')
+          .forEach(it => it.classList.remove('visible', 'active'));
+      }
+      if (resultsEl) {
+        resultsEl.classList.remove('in');
+        if (resultsEl.children.length) requestAnimationFrame(()=> resultsEl.classList.add('in'));
+        else { resultsEl.style.opacity = ''; resultsEl.style.transform = ''; }
+      }
+
+      try { cart = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (err) { cart = []; }
+      renderCart && typeof renderCart === 'function' && renderCart();
+      updateCartCount && typeof updateCartCount === 'function' && updateCartCount();
+
+      if ((!window.products || !window.products.length) && typeof loadProducts === 'function') {
+        loadProducts().catch(()=>{/* ignore */});
+      } else {
+        if (!window.fuse && typeof window.Fuse !== 'undefined') {
+          try {
+            window.fuse = new window.Fuse(window.products || [], {
+              includeScore: true,
+              shouldSort: true,
+              threshold: 0.45,
+              keys: [
+                { name: 'name', weight: 0.5 },
+                { name: 'description', weight: 0.3 },
+                { name: 'category', weight: 0.1 },
+                { name: 'sku', weight: 0.1 }
+              ]
+            });
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      const nav = document.querySelector('.navbar');
+      if (nav) {
+        nav.classList.remove('ready');
+        requestAnimationFrame(() => nav.classList.add('ready'));
+      }
+    });
+  })();
+</script>
+
 </body>
 </html>
