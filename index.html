@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Rongtuli</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
    * { box-sizing: border-box; }
@@ -983,15 +982,14 @@ body::before{
 </div>
 
 
-  <script>
-  // now `supabase` global is available
-  const { createClient } = supabase;
-  const SUPABASE_URL      = 'https://qhslurjvanppitwuuxtv.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-  // ...then run the rest of your code that uses `supabase`
-  const WHATSAPP_NUMBER   = '97451707046';
+    const SUPABASE_URL      = 'https://qhslurjvanppitwuuxtv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2x1cmp2YW5wcGl0d3V1eHR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTg0MjEsImV4cCI6MjA3NjUzNDQyMX0.8PNOewgJFDGVVIDdiEbdFE2x9Yzv29o2kdAANqaW1gA';
+    const WHATSAPP_NUMBER   = '97451707046';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 
   document.querySelectorAll('.card').forEach(el=>{
@@ -1633,7 +1631,6 @@ currencyLink.addEventListener('click', (e) => {
 
 </body>
 </html>
-
 
 
 
