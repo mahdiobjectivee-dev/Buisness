@@ -1023,7 +1023,7 @@ html, body { overflow-x: hidden; }
           <h2 style="margin:0">${escapeHtml(p.name)}</h2>
           <div style="font-size:13px;color:var(--muted);margin-top:6px">Category: ${escapeHtml(p.category||'Uncategorized')}</div>
           <div class="price">${formatPriceWithLabel(activePrice)}</div>
-          <div style="margin-top:10px;color:var(--muted)">${escapeHtml(p.description||'No description')}</div>
+         <div style="margin-top:10px;color:var(--muted); white-space: pre-line;">${escapeHtml(p.description||'No description')}</div>
 
           <div class="add-row">
             <div class="qty">
@@ -1441,6 +1441,7 @@ html, body { overflow-x: hidden; }
 
 </body>
 </html>
+
 
 
 
