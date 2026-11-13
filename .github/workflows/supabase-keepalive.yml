@@ -1,0 +1,30 @@
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # Runs every day at 03:17 UTC
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  touch-supabase:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Touch the keepalive row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$SUPABASE_URL/rest/v1/rpc/touch_keepalive" \
+            --header "apikey: $SUPABASE_ANON_KEY" \
+            --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            --header "Content-Type: application/json" \
+            --data '{}'
